@@ -17,7 +17,7 @@ class TestS3SearchSimpleWidget(unittest.TestCase):
 
     def setUp(self):
         # This is where I should create a resource and filters
-        self.resource = current.manager.define_resource("hrm", "human_resource")
+        self.resource = current.s3db.resource("hrm_human_resource")
         self.widget = S3SearchSimpleWidget(field="person_id$first_name", _size=20)
         self.virtual_field_widget = S3SearchSimpleWidget(field="course")
 
@@ -60,7 +60,7 @@ class TestS3SearchOptionsWidget(unittest.TestCase):
     """
 
     def setUp(self):
-        self.resource = current.manager.define_resource("hrm", "human_resource")
+        self.resource = current.s3db.resource("hrm_human_resource")
 
     def testQuery(self):
         # Test the query method
@@ -70,7 +70,7 @@ class TestS3SearchOptionsWidget(unittest.TestCase):
         T = current.T
         # Test the widget method
 
-        # Test the widget method with a virtual field and custom options
+        # Test the widget method with a virtual field and no options
         widget = S3SearchOptionsWidget("virtual_field",
                                        options={})
         output = widget.widget(self.resource, {})
@@ -80,12 +80,13 @@ class TestS3SearchOptionsWidget(unittest.TestCase):
 
         # Test widget with virtual field and one option.
         # Should return no-options message.
-        widget = S3SearchOptionsWidget("virtual_field",
-                                       options={1:"One"})
-        output = widget.widget(self.resource, {})
-        self.assertEqual(str(output),
-                         str(SPAN(T("No options available"),
-                                  _class="no-options-available")))
+        # - no longer!
+        #widget = S3SearchOptionsWidget("virtual_field",
+        #                               options={1:"One"})
+        #output = widget.widget(self.resource, {})
+        #self.assertEqual(str(output),
+        #                 str(SPAN(T("No options available"),
+        #                          _class="no-options-available")))
 
         # Test widget with virtual field and multiple options.
         widget = S3SearchOptionsWidget("virtual_field",
@@ -108,7 +109,8 @@ class TestS3SearchOptionsWidget(unittest.TestCase):
                                                _for="id-human_resource_search_select_virtual_field-1")
                                          )
                                       ),
-                                   _class="s3-checkboxes-widget")))
+                                   _class="s3-checkboxes-widget",
+                                   _name="human_resource_search_select_virtual_field_widget")))
 
 # =============================================================================
 class TestS3SearchMinMaxWidget(unittest.TestCase):
@@ -117,7 +119,7 @@ class TestS3SearchMinMaxWidget(unittest.TestCase):
     """
 
     def setUp(self):
-        #self.resource = current.manager.define_resource("inv", "track_item")
+        #self.resource = current.s3db.resource("inv_track_item")
         pass
 
     def testQuery(self):

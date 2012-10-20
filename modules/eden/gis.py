@@ -37,6 +37,7 @@ __all__ = ["S3LocationModel",
            "S3FeatureLayerModel",
            "S3MapModel",
            "S3GISThemeModel",
+           "S3POIFeedModel",
            "gis_location_filter",
            "gis_location_represent",
            "gis_location_lx_represent",
@@ -243,7 +244,7 @@ class S3LocationModel(S3Model):
 
         country_id = S3ReusableField("country_id", table,
                                      sortby = "name",
-                                     label = T("Country"),
+                                     label = messages.COUNTRY,
                                      requires = IS_NULL_OR(
                                                     IS_ONE_OF(db, "gis_location.id",
                                                               self.country_represent,
@@ -370,13 +371,15 @@ class S3LocationModel(S3Model):
             On Accept for GIS Locations (after DB I/O)
         """
 
-        # Update the Path (async if-possible)
-        vars = form.vars
-        feature = json.dumps(dict(id=vars.id,
-                                  level=vars.get("level", False),
-                                  ))
-        current.s3task.async("gis_update_location_tree",
-                             args=[feature])
+        if not current.auth.override:
+            # Update the Path (async if-possible)
+            # (skip during prepop)
+            vars = form.vars
+            feature = json.dumps(dict(id=vars.id,
+                                      level=vars.get("level", False),
+                                      ))
+            current.s3task.async("gis_update_location_tree",
+                                 args=[feature])
         return
 
     # -------------------------------------------------------------------------
@@ -610,8 +613,7 @@ class S3LocationModel(S3Model):
         if not level:
             return current.messages.NONE
         elif level == "L0":
-            T = current.T
-            return T("Country")
+            return current.messages.COUNTRY
         else:
             gis = current.gis
             config = gis.get_config()
@@ -1366,10 +1368,7 @@ class S3GISConfigModel(S3Model):
                   onvalidation=self.gis_config_onvalidation,
                   onaccept=self.gis_config_onaccept,
                   create_next=URL(args=["[id]", "layer_entity"]),
-                  # @ToDo: Not currently allowing delete, but with some
-                  # restrictions, we could.
-                  #delete_onaccept=self.gis_config_ondelete,
-                  update_ondelete=self.gis_config_ondelete,
+                  ondelete=self.gis_config_ondelete,
                   subheadings = {
                        T("Map Settings"): "zoom",
                        T("Form Settings"): "default_location_id",
@@ -1680,16 +1679,14 @@ class S3GISConfigModel(S3Model):
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def gis_config_ondelete(form):
+    def gis_config_ondelete(row):
         """
             If the currently-active config was deleted, clear the cache
         """
 
-        record_id = form.record_id
         s3 = current.response.s3
-        if s3.gis.config:
-            gis_config_id = s3.gis.config.id
-            if record_id == gis_config_id:
+        if s3.gis.config and \
+           s3.gis.config.id == row.id:
                 s3.gis.config = None
 
     # -------------------------------------------------------------------------
@@ -1785,7 +1782,11 @@ class S3GISConfigModel(S3Model):
         if not path:
             path = current.db.gis_marker.image.uploadfolder
 
-        image = open(os.path.join(path, filename), "rb")
+        if "/" in filename:
+            _path, filename = filename.split("/")
+            image = open(os.path.join(path, _path, filename), "rb")
+        else:
+            image = open(os.path.join(path, filename), "rb")
         return (filename, image)
 
     # -------------------------------------------------------------------------
@@ -3429,6 +3430,27 @@ class S3GISThemeModel(S3Model):
             return current.messages.UNKNOWN_OPT
 
 # =============================================================================
+class S3POIFeedModel(S3Model):
+    """ Data Model for POI feeds """
+
+    names = ["gis_poi_feed"]
+
+    def model(self):
+
+        # =====================================================================
+        # Table to store last update time for a POI feed
+        #
+        tablename = "gis_poi_feed"
+        table = self.define_table(tablename,
+                                  self.gis_location_id(),
+                                  Field("tablename"),
+                                  Field("last_update", "datetime"),
+                                  *s3_meta_fields())
+
+        # ---------------------------------------------------------------------
+        return Storage()
+
+# =============================================================================
 def name_field():
     T = current.T
     return S3ReusableField("name", length=64, notnull=True,
@@ -3521,7 +3543,7 @@ def gis_layer_onaccept(form):
 # =============================================================================
 def gis_location_filter(r):
     """
-        Filter resources to those for a specific location
+        Filter resources to those for a specified location
     """
 
     lfilter = current.session.s3.location_filter
@@ -3532,11 +3554,11 @@ def gis_location_filter(r):
     s3db = current.s3db
     gtable = s3db.gis_location
     query = (gtable.id == lfilter)
-    row = current.db(query).select(gtable.id,
-                                   gtable.name,
-                                   gtable.level,
-                                   gtable.path,
-                                   limitby=(0, 1)).first()
+    row = db(query).select(gtable.id,
+                           gtable.name,
+                           gtable.level,
+                           gtable.path,
+                           limitby=(0, 1)).first()
     if row and row.level:
         resource = r.resource
         if resource.name == "organisation":
@@ -3583,6 +3605,7 @@ def gis_location_represent(id, row=None, show_link=True, simpletext=False):
                                         table.level,
                                         table.parent,
                                         table.addr_street,
+                                        table.inherited,
                                         table.lat,
                                         table.lon,
                                         limitby=(0, 1)).first()
@@ -3653,7 +3676,7 @@ def gis_location_represent(id, row=None, show_link=True, simpletext=False):
         # We aren't going to use the represent, so skip making it.
         represent_text = current.T("Show on Map")
     elif row.level == "L0":
-        represent_text = "%s (%s)" % (row.name, current.T("Country"))
+        represent_text = "%s (%s)" % (row.name, current.messages.COUNTRY)
     else:
         s3db = current.s3db
         cache = s3db.cache
@@ -3692,6 +3715,7 @@ def gis_location_represent(id, row=None, show_link=True, simpletext=False):
                 # Get the 1st line of the street address.
                 represent_text = row.addr_street.splitlines()[0]
             if (not represent_text) and \
+               (row.inherited == False) and \
                (row.lat != None) and \
                (row.lon != None):
                 represent_text = lat_lon_represent(row)
@@ -3715,7 +3739,7 @@ def gis_location_represent(id, row=None, show_link=True, simpletext=False):
         represent = represent_text
 
     return represent
-            
+
 
 # =============================================================================
 def gis_location_lx_represent(record):
@@ -3828,6 +3852,7 @@ def gis_rheader(r, tabs=[]):
 
     if resourcename == "location":
         tabs = [(T("Location Details"), None),
+                (T("Import from OpenStreetMap"), "import_poi"),
                 (T("Local Names"), "name"),
                 (T("Key Value pairs"), "tag"),
                 ]

@@ -28,9 +28,7 @@
 """
 
 __all__ = ["S3DocumentLibrary",
-           "S3DocumentSourceModel",
            "doc_image_represent",
-           "doc_source_represent",
           ]
 
 import os
@@ -95,7 +93,7 @@ class S3DocumentLibrary(S3Model):
         tablename = "doc_document"
         table = define_table(tablename,
                              # Instance
-                             super_link("source_id", "doc_source_entity"),
+                             super_link("source_id", "stats_source"),
                              # Component not instance
                              super_link("site_id", "org_site"),
                              super_link("doc_id", doc_entity),
@@ -117,18 +115,12 @@ class S3DocumentLibrary(S3Model):
                              s3_date(label = T("Date Published")),
                              location_id(),
                              s3_comments(),
-                             #Field("entered", "boolean", label=T("Entered")),
                              Field("checksum", readable=False, writable=False),
                              *s3_meta_fields())
 
         # Field configuration
         table.file.represent = lambda file, table=table: \
                                self.doc_file_represent(file, table)
-        #table.location_id.readable = False
-        #table.location_id.writable = False
-        #table.entered.comment = DIV(_class="tooltip",
-        #                            _title="%s|%s" % (T("Entered"),
-        #                                              T("Has data from this Reference Document been entered into Sahana?")))
 
         # CRUD Strings
         ADD_DOCUMENT = T("Add Reference Document")
@@ -152,7 +144,7 @@ class S3DocumentLibrary(S3Model):
 
         # Resource Configuration
         configure(tablename,
-                  super_entity = "doc_source_entity",
+                  super_entity = "stats_source",
                   deduplicate=self.document_duplicate,
                   onvalidation=self.document_onvalidation)
 
@@ -172,6 +164,9 @@ class S3DocumentLibrary(S3Model):
 
         tablename = "doc_image"
         table = define_table(tablename,
+                             # Instance
+                             # @ToDo: Remove (Images aren't stats sources)
+                             super_link("source_id", "stats_source"),
                              # Component not instance
                              super_link("site_id", "org_site"),
                              super_link("pe_id", "pr_pentity"),
@@ -180,6 +175,7 @@ class S3DocumentLibrary(S3Model):
                                    requires = IS_NULL_OR(
                                                 IS_IMAGE(extensions=(s3.IMAGE_EXTENSIONS)
                                                          )),
+                                   represent = doc_image_represent,
                                    # upload folder needs to be visible to the download() function as well as the upload
                                    uploadfolder = os.path.join(current.request.folder,
                                                                "uploads",
@@ -199,16 +195,15 @@ class S3DocumentLibrary(S3Model):
                              organisation_id(
                                 widget = S3OrganisationAutocompleteWidget(default_from_profile=True)
                                 ),
-                             location_id(),
                              s3_date(label = T("Date Taken")),
+                             location_id(),
+                             # @ToDo: Remove (not being populated anyway)
+                             #self.stats_group_type_id(),
                              s3_comments(),
                              Field("checksum", readable=False, writable=False),
                              *s3_meta_fields())
 
-        # Field configuration
-        table.file.represent = doc_image_represent
-
-       # CRUD Strings
+        # CRUD Strings
         ADD_IMAGE = T("Add Photo")
         crud_strings[tablename] = Storage(
             title_create = ADD_IMAGE,
@@ -229,9 +224,11 @@ class S3DocumentLibrary(S3Model):
 
         # Resource Configuration
         configure(tablename,
+                  super_entity = "stats_source",
                   deduplicate=self.document_duplicate,
                   onvalidation=lambda form: \
-                                self.document_onvalidation(form, document=False))
+                            self.document_onvalidation(form, document=False))
+
         # ---------------------------------------------------------------------
         # Pass model-global names to response.s3
         #
@@ -314,8 +311,6 @@ class S3DocumentLibrary(S3Model):
             # This is a prepop, so file not in form
             return
 
-        import cgi
-
         T = current.T
         db = current.db
 
@@ -342,6 +337,7 @@ class S3DocumentLibrary(S3Model):
             form.errors.url = msg
 
         # Do a checksum on the file to see if it's a duplicate
+        #import cgi
         #if isinstance(doc, cgi.FieldStorage) and doc.filename:
         #    f = doc.file
         #    vars.checksum = doc_checksum(f.read())
@@ -361,81 +357,6 @@ class S3DocumentLibrary(S3Model):
         #                              (T("This file already exists on the server as"), doc_name)
 
         return
-
-# =============================================================================
-class S3DocumentSourceModel(S3Model):
-
-    names = ["doc_source_entity",
-             "doc_source_id",
-             "doc_source"
-             ]
-
-    def model(self):
-
-        T = current.T
-
-        # ---------------------------------------------------------------------
-        # Document-source entities
-        #
-        source_types = Storage(
-                               #pr_pentity = T("Person"),
-                               doc_document = T("Document"),
-                               #flood_gauge = T("Flood Gauge"),
-                               #survey_series = T("Survey")
-                               )
-
-        tablename = "doc_source_entity"
-
-        table = self.super_entity(tablename, "source_id", source_types,
-                                  Field("name",
-                                        label=T("Name")),
-                                  )
-        # Reusable Field
-        source_id = S3ReusableField("source_id", table,
-                                    requires = IS_NULL_OR(
-                                                IS_ONE_OF(current.db,
-                                                          "doc_source_entity.source_id",
-                                                          doc_source_represent)),
-                                    represent = doc_source_represent,
-                                    label = T("Source"),
-                                    ondelete = "CASCADE")
-        # Components
-        self.add_component("doc_source", doc_source_entity=self.super_key(table))
-
-        # ---------------------------------------------------------------------
-        # Document-source details
-        #
-        tablename = "doc_source"
-        table = self.define_table(tablename,
-                                  # This is a component, so needs to be a super_link
-                                  # - can't override field name, ondelete or requires
-                                  self.super_link("source_id", "doc_source_entity"),
-                                  Field("name",
-                                        label=T("Name")),
-                                  Field("reliability",
-                                        label=T("Reliability")),
-                                  Field("review",
-                                        label=T("Review")),
-                                  *s3_meta_fields()
-                                  )
-
-        # ---------------------------------------------------------------------
-        # Pass model-global names to response.s3
-        #
-        return Storage(
-                doc_source_id = source_id
-            )
-
-    # -------------------------------------------------------------------------
-    def defaults(self):
-        """ Safe defaults if the module is disabled """
-        source_id = S3ReusableField("source_id", "integer",
-                                    readable=False,
-                                    writable=False)
-
-        return Storage(
-                doc_source_id = source_id
-            )
 
 # =============================================================================
 def doc_image_represent(filename):
@@ -478,24 +399,5 @@ def doc_checksum(docstr):
     converted = hashlib.sha1(docstr).hexdigest()
     return converted
 
-# =============================================================================
-def doc_source_represent(id, row=None):
-    """ FK representation """
-
-    if row:
-        return row.name
-    elif not id:
-        return current.messages.NONE
-    elif isinstance(id, Row):
-        return id.name
-
-    db = current.db
-    table = db.doc_source_entity
-    r = db(table._id == id).select(table.name,
-                                   limitby = (0, 1)).first()
-    try:
-        return r.name
-    except:
-        return current.messages.UNKNOWN_OPT
 
 # END =========================================================================

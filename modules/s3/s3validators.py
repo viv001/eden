@@ -198,6 +198,10 @@ class IS_INT_AMOUNT(IS_INT_IN_RANGE):
 
         if number is None:
             return ""
+        try:
+            intnumber = int(number)
+        except:
+            intnumber = number
 
         T = current.T
         settings = current.deployment_settings
@@ -218,7 +222,7 @@ class IS_INT_AMOUNT(IS_INT_IN_RANGE):
         else:
             sign = ""
 
-        str_number = unicode(number)
+        str_number = unicode(intnumber)
 
         if str_number[0] == "-":
             str_number = str_number[1:]
@@ -365,6 +369,8 @@ class IS_ONE_OF_EMPTY(Validator):
                  filter_opts=None,
                  not_filterby=None,
                  not_filter_opts=None,
+                 updateable=False,
+                 instance_types=None,
                  error_message="invalid value!",
                  orderby=None,
                  groupby=None,
@@ -374,6 +380,37 @@ class IS_ONE_OF_EMPTY(Validator):
                  sort=True,
                  _and=None,
                 ):
+        """
+            Validator for foreign keys.
+
+            @param dbset: a Set of records like db(query), or db itself
+            @param field: the field in the referenced table
+            @param label: lookup method for the label corresponding a value,
+                          alternatively a string template to be filled with
+                          values from the record
+            @param filterby: a field in the referenced table to filter by
+            @param filter_opts: values for the filterby field which indicate
+                                records to include
+            @param not_filterby: a field in the referenced table to filter by
+            @param not_filter_opts: values for not_filterby field which indicate
+                                    records to exclude
+            @param updateable: only include records in the referenced table which
+                               can be updated by the user (if False, all readable
+                               records will be included)
+            @param instance_types: if the referenced table is a super-entity, then
+                                   only include these instance types (this parameter
+                                   is required for super entity lookups!)
+            @param error_message: the error message to return for failed validation
+            @param orderby: orderby for the options
+            @param groupby: groupby for the options
+            @param left: additional left joins required for the options lookup
+                         (super-entity instance left joins will be included
+                         automatically)
+            @param multiple: allow multiple values (for list:reference types)
+            @param zero: add this as label for the None-option (allow selection of "None")
+            @param sort: sort options alphabetically by their label
+            @param _and: internal use
+        """
 
         if hasattr(dbset, "define_table"):
             self.dbset = dbset()
@@ -419,6 +456,9 @@ class IS_ONE_OF_EMPTY(Validator):
         self.not_filterby = not_filterby
         self.not_filter_opts = not_filter_opts
 
+        self.updateable = updateable
+        self.instance_types = instance_types
+
     # -------------------------------------------------------------------------
     def set_self_id(self, id):
         if self._and:
@@ -463,9 +503,14 @@ class IS_ONE_OF_EMPTY(Validator):
                 # Caching breaks Colorbox dropdown refreshes
                 #dd = dict(orderby=orderby, groupby=groupby, cache=(current.cache.ram, 60))
                 dd = dict(orderby=orderby, groupby=groupby)
-                query = current.auth.s3_accessible_query("read", table)
+
+                method = "update" if self.updateable else "read"
+                query, left = self.accessible_query(method, table,
+                                                    instance_types=self.instance_types)
+
                 if "deleted" in table:
                     query = ((table["deleted"] == False) & query)
+
                 filterby = self.filterby
                 if filterby and filterby in table:
                     filter_opts = self.filter_opts
@@ -476,30 +521,40 @@ class IS_ONE_OF_EMPTY(Validator):
                             filter_opts = [f for f in filter_opts if f is not None]
                             if filter_opts:
                                 _query = _query | (table[filterby].belongs(filter_opts))
-                            query = query & _query
+                            query &= _query
                         else:
-                            query = query & (table[filterby].belongs(filter_opts))
+                            query &= (table[filterby].belongs(filter_opts))
                     if not self.orderby:
                         dd.update(orderby=table[filterby])
-                if self.not_filterby and self.not_filterby in table and self.not_filter_opts:
-                    query = query & (~(table[self.not_filterby].belongs(self.not_filter_opts)))
+
+                not_filterby = self.not_filterby
+                if not_filterby and not_filterby in table:
+                    not_filter_opts = self.not_filter_opts
+                    if not_filter_opts:
+                        query &= (~(table[not_filterby].belongs(not_filter_opts)))
                     if not self.orderby:
                         dd.update(orderby=table[filterby])
+
+                if self.left is not None:
+                    self.left.append(left)
+                else:
+                    self.left = left
                 if self.left is not None:
                     dd.update(left=self.left)
-                records = dbset(query).select(*fields, **dd)
+                records = dbset(query).select(distinct=True, *fields, **dd)
             else:
                 # Note this does not support filtering.
                 orderby = self.orderby or \
                           reduce(lambda a, b: a|b, (f for f in fields
                                                     if not f.name == "id"))
+                # Caching breaks Colorbox dropdown refreshes
                 #dd = dict(orderby=orderby, cache=(current.cache.ram, 60))
                 dd = dict(orderby=orderby)
                 records = dbset.select(db[self.ktable].ALL, **dd)
             self.theset = [str(r[self.kfield]) for r in records]
-            #labels = []
             label = self.label
             try:
+                # Is a function
                 labels = map(label, records)
             except TypeError:
                 if isinstance(label, str):
@@ -508,9 +563,6 @@ class IS_ONE_OF_EMPTY(Validator):
                     labels = map(lambda r: \
                                  " ".join([r[l] for l in label if l in r]),
                                  records)
-                elif callable(label):
-                    # Is a function
-                    labels = map(label, records)
                 elif "name" in table:
                     labels = map(lambda r: r.name, records)
                 else:
@@ -542,6 +594,64 @@ class IS_ONE_OF_EMPTY(Validator):
         else:
             self.theset = None
             self.labels = None
+
+    # -------------------------------------------------------------------------
+    @classmethod
+    def accessible_query(cls, method, table, instance_types=None):
+        """
+            Returns an accessible query (and left joins, if necessary) for
+            records in table the user is permitted to access with method
+
+            @param method: the method (e.g. "read" or "update")
+            @param table: the table
+            @param instance_types: list of instance tablenames, if table is
+                                   a super-entity (required in this case!)
+
+            @returns: tuple (query, left) where query is the query and left joins
+                      is the list of left joins required for the query
+
+            @note: for higher security policies and super-entities with many
+                   instance types this can give a very complex query. Try to
+                   always limit the instance types to what is really needed
+        """
+
+        DEFAULT = (table._id > 0)
+
+        left = None
+
+        if "instance_type" in table:
+            # Super-entity
+            if not instance_types:
+                return DEFAULT, left
+            query = None
+            auth = current.auth
+            s3db = current.s3db
+            for instance_type in instance_types:
+                itable = s3db.table(instance_type)
+                if itable is None:
+                    continue
+
+                join = itable.on(itable[table._id.name] == table._id)
+                if left is None:
+                    left = [join]
+                else:
+                    left.append(join)
+
+                q = (itable._id != None) & \
+                    auth.s3_accessible_query(method, itable)
+                if "deleted" in itable:
+                    q &= itable.deleted != True
+                if query is None:
+                    query = q
+                else:
+                    query |= q
+
+            if query is None:
+                query = DEFAULT
+        else:
+            query = current.auth.s3_accessible_query(method, table)
+
+        return query, left
 
     # -------------------------------------------------------------------------
     # Removed as we don't want any options downloaded unnecessarily
@@ -1382,6 +1492,7 @@ class IS_ADD_PERSON_WIDGET(Validator):
 
         T = current.T
         db = current.db
+        s3db = current.s3db
         request = current.request
         settings = current.deployment_settings
 
@@ -1432,20 +1543,17 @@ class IS_ADD_PERSON_WIDGET(Validator):
         if request.env.request_method == "POST":
             _vars = request.post_vars
             mobile = _vars["mobile_phone"]
-
-            # Validate the phone number
-            if _vars.mobile_phone:
+            if mobile:
+                # Validate the phone number
                 regex = re.compile(single_phone_number_pattern)
-                if not regex.match(_vars.mobile_phone):
+                if not regex.match(mobile):
                     error = T("Invalid phone number")
                     return (person_id, error)
 
             validate = current.manager.validate
             if person_id:
-                # Update the person record
-                query = (ptable.id == person_id)
-
                 # Validate and update the person record
+                query = (ptable.id == person_id)
                 data = Storage()
                 for f in ptable._filter_fields(_vars):
                     value, error = validate(ptable, None, f, _vars[f])
@@ -1457,30 +1565,54 @@ class IS_ADD_PERSON_WIDGET(Validator):
                 if data:
                     db(query).update(**data)
 
-                # Update the contact information
+                # Update the contact information & details
                 record = db(query).select(ptable.pe_id, limitby=(0, 1)).first()
                 if record:
                     pe_id = record.pe_id
 
-                    record = ctable(pe_id=pe_id, contact_method="EMAIL")
+                    r = ctable(pe_id=pe_id, contact_method="EMAIL")
                     email = _vars["email"]
-                    if record and email: # update
-                        if email != record.value:
-                            db(ctable.id == record.id).update(value=email)
-                    else: # insert
-                        ctable.insert(pe_id=pe_id,
-                                      contact_method="EMAIL",
-                                      value=email)
+                    if email:
+                        query = (ctable.pe_id == pe_id) & \
+                                (ctable.contact_method == "EMAIL") &\
+                                (ctable.deleted != True)
+                        r = db(query).select(ctable.value,
+                                             limitby=(0, 1)).first()
+                        if r: # update
+                            if email != r.value:
+                                db(query).update(value=email)
+                        else: # insert
+                            ctable.insert(pe_id=pe_id,
+                                          contact_method="EMAIL",
+                                          value=email)
 
-                    record = ctable(pe_id=pe_id, contact_method="SMS")
-                    if record: # update
-                        if mobile != record.value:
-                            db(ctable.id == record.id).update(value=mobile)
-                    else: # insert
-                        if mobile: # Don't insert an empty number
+                    if mobile:
+                        query = (ctable.pe_id == pe_id) & \
+                                (ctable.contact_method == "SMS") &\
+                                (ctable.deleted != True)
+                        r = db(query).select(ctable.value,
+                                             limitby=(0, 1)).first()
+                        if r: # update
+                            if mobile != r.value:
+                                db(query).update(value=mobile)
+                        else: # insert
                             ctable.insert(pe_id=pe_id,
                                           contact_method="SMS",
                                           value=mobile)
+
+                    occupation = _vars["occupation"]
+                    if occupation:
+                        pdtable = s3db.pr_person_details
+                        query = (pdtable.person_id == person_id) & \
+                                (pdtable.deleted != True)
+                        r = db(query).select(pdtable.occupation,
+                                             limitby=(0, 1)).first()
+                        if r: # update
+                            if occupation != r.occupation:
+                                db(query).update(occupation=occupation)
+                        else: # insert
+                            pdtable.insert(person_id=person_id,
+                                           occupation=occupation)
 
             else:
                 # Create a new person record
@@ -1511,7 +1643,7 @@ class IS_ADD_PERSON_WIDGET(Validator):
 
                 if person_id:
                     # Update the super-entities
-                    current.s3db.update_super(ptable, dict(id=person_id))
+                    s3db.update_super(ptable, dict(id=person_id))
                     # Read the created pe_id
                     query = (ptable.id == person_id)
                     person = db(query).select(ptable.pe_id,
@@ -1522,10 +1654,13 @@ class IS_ADD_PERSON_WIDGET(Validator):
                         ctable.insert(pe_id=person.pe_id,
                                       contact_method="EMAIL",
                                       value=_vars.email)
-                    if _vars.mobile_phone:
+                    if mobile:
                         ctable.insert(pe_id=person.pe_id,
                                       contact_method="SMS",
                                       value=_vars.mobile_phone)
+                    if _vars.occupation:
+                        s3db.pr_person_details.insert(person_id = person_id,
+                                                      occupation = occupation)
                 else:
                     # Something went wrong
                     return (person_id, self.error_message or \

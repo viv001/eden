@@ -4,6 +4,7 @@
 
     <!-- **********************************************************************
          Human Resources - CSV Import Stylesheet
+         Must be imported through the pr_person resource
 
          Column headers defined in this stylesheet:
 
@@ -25,18 +26,26 @@
          Last Name......................optional.....person last name (required in some deployments)
          Initials.......................optional.....person initials
          DOB............................optional.....person date of birth
-         Father Name....................optional.....person father name
-         Mother Name....................optional.....person mother name
-         Religion.......................optional.....person religion
+         Occupation.....................optional.....person_details occupation
+         Company........................optional.....person_details company
+         Affiliations............ ......optional.....person_details affiliation
+         Father Name....................optional.....person_details father name
+         Mother Name....................optional.....person_details mother name
+         Religion.......................optional.....person_details religion
+         Blood Type.....................optional.....pr_physical_description blood_type
          National ID....................optional.....person identity type = 2, value
          Passport No....................optional.....person identity type = 1, value
          Passport Country...............optional.....person identity
          Passport Expiry Date...........optional.....person identity
          Email..........................required.....person email address
          Mobile Phone...................optional.....person mobile phone number
+         Home Phone.....................optional.....home phone number
          Office Phone...................optional.....office phone number
          Skype..........................optional.....person skype ID
          Callsign.......................optional.....person Radio Callsign
+         Emergency Contact Name.........optional.....pr_contact_emergency name
+         Emergency Contact Relationship.optional.....pr_contact_emergency relationship
+         Emergency Contact Phone........optional.....pr_contact_emergency phone
          Home Address...................optional.....person home address
          Home Postcode..................optional.....person home address postcode
          Home Lat.......................optional.....person home address latitude
@@ -63,6 +72,9 @@
          Grade..........................optional.....person education grade
          Year...........................optional.....person education year
          Institute......................optional.....person education institute
+         Volunteer Cluster Type.........optional.....volunteer_cluster cluster_type name
+         Volunteer Cluster..............optional.....volunteer_cluster cluster name
+         Volunteer Cluster Position.....optional.....volunteer_cluster cluster_position name
 
          Column headers looked up in labels.xml:
 
@@ -135,6 +147,19 @@
     <xsl:key name="jobroles"
              match="row"
              use="col[contains($JobRole, concat('|', @field, '|'))]"/>
+             
+    <xsl:key name="volunteerclusters" 
+             match="row"
+             use="concat(col[@field='Volunteer Cluster Type'],
+                         col[@field='Volunteer Cluster'])"/>
+
+    <xsl:key name="volunteerclustertypes" 
+             match="row"
+             use="col[@field='Volunteer Cluster Type']"/>
+
+    <xsl:key name="volunteerclustertpositions" 
+             match="row"
+             use="col[@field='Volunteer Cluster Position']"/>
 
     <!-- ****************************************************************** -->
     <xsl:template match="/">
@@ -183,6 +208,21 @@
                 <xsl:call-template name="JobRole">
                     <xsl:with-param name="type">resource</xsl:with-param>
                 </xsl:call-template>
+            </xsl:for-each>
+
+            <!-- Volunteer Clusters -->
+            <xsl:for-each select="//row[generate-id(.)=generate-id(key('volunteerclusters', concat(col[@field='Volunteer Cluster Type'],col[@field='Volunteer Cluster']))[1])]">
+                <xsl:call-template name="VolunteerCluster"/>
+            </xsl:for-each>
+
+            <!-- Volunteer Cluster Types -->
+            <xsl:for-each select="//row[generate-id(.)=generate-id(key('volunteerclustertypes', col[@field='Volunteer Cluster Type'])[1])]">
+                <xsl:call-template name="VolunteerClusterType"/>
+            </xsl:for-each>
+
+            <!-- Volunteer Cluster Positions -->
+            <xsl:for-each select="//row[generate-id(.)=generate-id(key('volunteerclustertpositions', col[@field='Volunteer Cluster Position'])[1])]">
+                <xsl:call-template name="VolunteerClusterPosition"/>
             </xsl:for-each>
 
             <!-- Process all table rows for person records -->
@@ -298,13 +338,16 @@
                         <xsl:value-of select="concat(col[@field='Organisation'],$BranchName)"/>
                     </xsl:attribute>
                     <data field="name"><xsl:value-of select="$BranchName"/></data>
-                    <resource name="org_organisation_branch" alias="parent">
-                        <reference field="organisation_id" resource="org_organisation">
-                            <xsl:attribute name="tuid">
-                                <xsl:value-of select="col[@field='Organisation']"/>
-                            </xsl:attribute>
-                        </reference>
-                    </resource>
+                    <!-- Don't create Orgs as Branches of themselves -->
+                    <xsl:if test="col[@field='Organisation']!=$BranchName">
+                        <resource name="org_organisation_branch" alias="parent">
+                            <reference field="organisation_id" resource="org_organisation">
+                                <xsl:attribute name="tuid">
+                                    <xsl:value-of select="col[@field='Organisation']"/>
+                                </xsl:attribute>
+                            </reference>
+                        </resource>
+                    </xsl:if>
                 </resource>
             </xsl:when>
             <xsl:when test="$OrgName!=''">
@@ -432,16 +475,27 @@
                     <xsl:attribute name="value"><xsl:value-of select="$gender"/></xsl:attribute>
                 </data>
             </xsl:if>
-            <data field="father_name"><xsl:value-of select="col[@field='Father Name']"/></data>
-            <data field="mother_name"><xsl:value-of select="col[@field='Mother Name']"/></data>
 
-            <xsl:if test="col[@field='Religion']">
-                <xsl:variable name="smallcase" select="'abcdefghijklmnopqrstuvwxyz'" />
-                <xsl:variable name="uppercase" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ'" />
-                <xsl:variable name="religion">
-                    <xsl:value-of select="translate(col[@field='Religion'], $uppercase, $smallcase)"/>
-                </xsl:variable>
-                <data field="religion"><xsl:value-of select="$religion"/></data>
+            <resource name="pr_person_details">
+                <data field="father_name"><xsl:value-of select="col[@field='Father Name']"/></data>
+                <data field="mother_name"><xsl:value-of select="col[@field='Mother Name']"/></data>
+	            <xsl:if test="col[@field='Religion']">
+	                <xsl:variable name="smallcase" select="'abcdefghijklmnopqrstuvwxyz'" />
+	                <xsl:variable name="uppercase" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ'" />
+	                <xsl:variable name="religion">
+	                    <xsl:value-of select="translate(col[@field='Religion'], $uppercase, $smallcase)"/>
+	                </xsl:variable>
+	                <data field="religion"><xsl:value-of select="$religion"/></data>
+	            </xsl:if>
+	            <data field="occupation"><xsl:value-of select="col[@field='Occupation']"/></data>
+	            <data field="company"><xsl:value-of select="col[@field='Company']"/></data>
+	            <data field="affiliations"><xsl:value-of select="col[@field='Affiliations']"/></data>
+            </resource>
+
+            <xsl:if test="col[@field='Blood Type']!=''">
+                <resource name="pr_physical_description">
+                    <data field="blood_type"><xsl:value-of select="col[@field='Blood Type']"/></data>
+                </resource>
             </xsl:if>
 
             <!-- Identity Information -->
@@ -451,7 +505,7 @@
             <xsl:call-template name="ContactInformation"/>
 
             <!-- Address -->
-            <xsl:if test="col[@field='Home Address']!=''">
+            <xsl:if test="col[@field='Home Address'] or col[@field='Home Postcode'] or col[@field='Home L4'] or col[@field='Home L3'] or col[@field='Home L2'] or col[@field='Home L1']">
                 <xsl:call-template name="Address">
                     <xsl:with-param name="address" select="col[@field='Home Address']/text()"/>
                     <xsl:with-param name="postcode" select="col[@field='Home Postcode']/text()"/>
@@ -464,7 +518,7 @@
                 </xsl:call-template>
             </xsl:if>
 
-            <xsl:if test="col[@field='Permanent Address']!=''">
+            <xsl:if test="col[@field='Permanent Address'] or col[@field='Permanent Postcode'] or col[@field='Permanent L4'] or col[@field='Permanent L3'] or col[@field='Permanent L2'] or col[@field='Permanent L1']">
                 <xsl:call-template name="Address">
                     <xsl:with-param name="address" select="col[@field='Permanent Address']/text()"/>
                     <xsl:with-param name="postcode" select="col[@field='Permanent Postcode']/text()"/>
@@ -523,7 +577,7 @@
         </resource>
 
         <!-- Locations -->
-        <xsl:if test="col[@field='Home Address']!=''">
+        <xsl:if test="col[@field='Home Address'] or col[@field='Home Postcode'] or col[@field='Home L4'] or col[@field='Home L3'] or col[@field='Home L2'] or col[@field='Home L1']">
             <xsl:call-template name="Locations">
                 <xsl:with-param name="address" select="col[@field='Home Address']/text()"/>
                 <xsl:with-param name="postcode" select="col[@field='Home Postcode']/text()"/>
@@ -537,7 +591,7 @@
                 <xsl:with-param name="lon" select="col[@field='Home Lon']/text()"/>
             </xsl:call-template>
         </xsl:if>
-        <xsl:if test="col[@field='Permanent Address']!=''">
+        <xsl:if test="col[@field='Permanent Address'] or col[@field='Permanent Postcode'] or col[@field='Permanent L4'] or col[@field='Permanent L3'] or col[@field='Permanent L2'] or col[@field='Permanent L1']">
             <xsl:call-template name="Locations">
                 <xsl:with-param name="address" select="col[@field='Permanent Address']/text()"/>
                 <xsl:with-param name="postcode" select="col[@field='Permanent Postcode']/text()"/>
@@ -634,6 +688,33 @@
                     </xsl:attribute>
                 </reference>
             </xsl:if>
+            
+            <!-- Volunteer Cluster (voluteers only) -->
+            <xsl:if test="col[@field='Volunteer Cluster Type'] != '' or col[@field='Volunteer Cluster'] != '' or col[@field='Volunteer Cluster Position'] != ''">
+              <resource name="vol_volunteer_cluster">
+                <xsl:if test="col[@field='Volunteer Cluster Type'] != ''">
+                    <reference field="vol_cluster_type_id" resource="vol_cluster_type">
+                        <xsl:attribute name="tuid">
+                            <xsl:value-of select="col[@field='Volunteer Cluster Type']"/>
+                        </xsl:attribute>
+                    </reference>
+                </xsl:if>
+                <xsl:if test="col[@field='Volunteer Cluster']!=''">
+                    <reference field="vol_cluster_id" resource="vol_cluster">
+                        <xsl:attribute name="tuid">
+                            <xsl:value-of select="concat(col[@field='Volunteer Cluster Type'],col[@field='Volunteer Cluster'])"/>
+                        </xsl:attribute>
+                    </reference>
+                </xsl:if>
+                <xsl:if test="col[@field='Volunteer Cluster Position'] != ''">
+                    <reference field="vol_cluster_position_id" resource="vol_cluster_position">
+                        <xsl:attribute name="tuid">
+                            <xsl:value-of select="col[@field='Volunteer Cluster Position']"/>
+                        </xsl:attribute>
+                    </reference>
+                 </xsl:if>
+               </resource>
+            </xsl:if>
 
         </resource>
 
@@ -697,6 +778,15 @@
             </resource>
         </xsl:if>
 
+        <xsl:if test="col[@field='Home Phone']!=''">
+            <resource name="pr_contact">
+                <data field="contact_method" value="HOME_PHONE"/>
+                <data field="value">
+                    <xsl:value-of select="col[@field='Home Phone']/text()"/>
+                </data>
+            </resource>
+        </xsl:if>
+
         <xsl:if test="col[@field='Office Phone']!=''">
             <resource name="pr_contact">
                 <data field="contact_method" value="WORK_PHONE"/>
@@ -720,6 +810,20 @@
                 <data field="contact_method" value="RADIO"/>
                 <data field="value">
                     <xsl:value-of select="col[@field='Callsign']/text()"/>
+                </data>
+            </resource>
+        </xsl:if>
+
+        <xsl:if test="col[@field='Emergency Contact Name']!=''">
+            <resource name="pr_contact_emergency">
+                <data field="name">
+                    <xsl:value-of select="col[@field='Emergency Contact Name']/text()"/>
+                </data>
+                <data field="relationship">
+                    <xsl:value-of select="col[@field='Emergency Contact Relationship']/text()"/>
+                </data>
+                <data field="phone">
+                    <xsl:value-of select="col[@field='Emergency Contact Phone']/text()"/>
                 </data>
             </resource>
         </xsl:if>
@@ -1174,6 +1278,49 @@
             </resource>
         </xsl:if>
 
+    </xsl:template>
+
+    <!-- ****************************************************************** -->
+    <xsl:template name="VolunteerClusterType">
+        <xsl:variable name="volunteerclustertype" select="col[@field='Volunteer Cluster Type']"/>
+        <xsl:if test="$volunteerclustertype!=''">
+            <resource name="vol_cluster_type">
+                <xsl:attribute name="tuid">
+                    <xsl:value-of select="$volunteerclustertype"/>
+                </xsl:attribute>
+                <data field="name"><xsl:value-of select="$volunteerclustertype"/></data>
+            </resource>
+        </xsl:if>
+    </xsl:template>
+    <!-- ****************************************************************** -->
+    <xsl:template name="VolunteerCluster">
+        <xsl:variable name="volunteercluster" select="col[@field='Volunteer Cluster']"/>
+        <xsl:variable name="volunteerclustertype" select="col[@field='Volunteer Cluster Type']"/>
+        <xsl:if test="$volunteercluster!=''">
+            <resource name="vol_cluster">
+                <xsl:attribute name="tuid">
+                    <xsl:value-of select="concat($volunteerclustertype,$volunteercluster)"/>
+                </xsl:attribute>
+                <reference field="vol_cluster_type_id" resource="vol_cluster_type">
+                    <xsl:attribute name="tuid">
+                        <xsl:value-of select="$volunteerclustertype"/>
+                    </xsl:attribute>
+                </reference>
+                <data field="name"><xsl:value-of select="$volunteercluster"/></data>
+            </resource>
+        </xsl:if>
+    </xsl:template>
+    <!-- ****************************************************************** -->
+    <xsl:template name="VolunteerClusterPosition">
+        <xsl:variable name="volunteerclusterposition" select="col[@field='Volunteer Cluster Position']"/>
+        <xsl:if test="$volunteerclusterposition!=''">
+            <resource name="vol_cluster_position">
+                <xsl:attribute name="tuid">
+                    <xsl:value-of select="$volunteerclusterposition"/>
+                </xsl:attribute>
+                <data field="name"><xsl:value-of select="$volunteerclusterposition"/></data>
+            </resource>
+        </xsl:if>
     </xsl:template>
 
     <!-- ****************************************************************** -->

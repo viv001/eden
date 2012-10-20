@@ -25,14 +25,7 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from gluon import current
-import unittest
 from tests.web2unittest import SeleniumUnitTest
-from selenium.common.exceptions import NoSuchElementException
-from s3 import s3_debug
-from tests import *
-#import unittest, re, time
-import time
 
 class CreateVolunteer(SeleniumUnitTest):
     def test_hrm002_create_volunteer(self):
@@ -43,14 +36,15 @@ class CreateVolunteer(SeleniumUnitTest):
             @TestDoc: https://docs.google.com/spreadsheet/ccc?key=0AmB3hMcgB-3idG1XNGhhRG9QWF81dUlKLXpJaFlCMFE
             @Test Wiki: http://eden.sahanafoundation.org/wiki/DeveloperGuidelines/Testing
         """
+
         print "\n"
 
         self.login(account="admin", nexturl="vol/volunteer/create")
 
         self.create("hrm_human_resource", 
                     [( "organisation_id",
-                       "Acme Suppliers",
-                       "autocomplete"),
+                       "International Federation of Red Cross and Red Crescent Societies (IFRC)",
+                       "option"),
                      ( "first_name",
                        "John",
                        "pr_person"),
@@ -58,7 +52,7 @@ class CreateVolunteer(SeleniumUnitTest):
                        "Thompson",
                        "pr_person"),
                      ( "email",
-                       "test8@notavalidemail.com",
+                       "test81@notavalidemail.com",
                        "pr_person"),
                      ( "job_title_id",
                        "Security",

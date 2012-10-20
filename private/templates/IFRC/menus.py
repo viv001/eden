@@ -44,11 +44,11 @@ class S3MainMenu(default.S3MainMenu):
             homepage("hrm", "org", name=T("Staff"),
                     vars=dict(group="staff"))(
                 MM("Staff", c="hrm", f="staff"),
-                #MM("Teams", c="hrm", f="group"),
+                MM("Teams", c="hrm", f="group"),
                 MM("National Societies", c="org", f="organisation",
                     vars = red_cross_filter),
                 MM("Offices", c="org", f="office"),
-                MM("Job Roles", c="hrm", f="job_role"),
+                MM("Job Titles", c="hrm", f="job_title"),
                 #MM("Skill List", c="hrm", f="skill"),
                 MM("Training Events", c="hrm", f="training_event"),
                 MM("Training Courses", c="hrm", f="course"),
@@ -56,8 +56,8 @@ class S3MainMenu(default.S3MainMenu):
             ),
             homepage("vol", name=T("Volunteers"))(
                 MM("Volunteers", c="vol", f="volunteer"),
-                #MM("Teams", c="vol", f="group"),
-                MM("Job Roles", c="vol", f="job_role"),
+                MM("Teams", c="vol", f="group"),
+                MM("Volunteer Roles", c="vol", f="job_title"),
                 #MM("Skill List", c="vol", f="skill"),
                 MM("Training Events", c="vol", f="training_event"),
                 MM("Training Courses", c="vol", f="course"),
@@ -121,7 +121,7 @@ class S3MainMenu(default.S3MainMenu):
                     DB("Certificates", f="certificate"),
                     DB("Training Courses", f="course"),
                     #DB("Skills", f="skill"),
-                    DB("Job Roles", f="job_title")
+                    DB("Job Titles", f="job_title")
                 ))
         elif request.controller in ("hrm", "org"):
             dashboard = DB()(
@@ -130,7 +130,7 @@ class S3MainMenu(default.S3MainMenu):
                     image = "graphic_staff_wide.png",
                     title = "Staff")(
                     DB("Manage Staff Data", f="staff"),
-                    #DB("Manage Teams Data", f="group"),
+                    DB("Manage Teams Data", f="group"),
                 ),
                 DB("OFFICES",
                     c="org",
@@ -146,7 +146,7 @@ class S3MainMenu(default.S3MainMenu):
                     DB("Certificates", f="certificate"),
                     DB("Training Courses", f="course"),
                     #DB("Skills", f="skill"),
-                    DB("Job Roles", f="job_title")
+                    DB("Job Titles", f="job_title")
                 ))
 
         elif request.controller == "default" and request.function == "index":
@@ -228,10 +228,11 @@ class S3MainMenu(default.S3MainMenu):
             menu_personal = MP()(
                         MP("Administration", c="admin", f="index",
                            check=s3_has_role(ADMIN)),
-                        MP("Logout", c="default", f="user",
-                           m="logout"),
+                        MP("Profile", c="default", f="person"),
                         MP("Change Password", c="default", f="user",
                            m="change_password"),
+                        MP("Logout", c="default", f="user",
+                           m="logout"),
                         menu_lang,
             )
         return menu_personal
@@ -268,11 +269,11 @@ class S3OptionsMenu(default.S3OptionsMenu):
                         M("Import", f="person", m="import",
                           vars=staff, p="create"),
                     ),
-                    # M("Teams", c="hrm", f="group",
-                      # check=manager_mode)(
-                        # M("New Team", m="create"),
-                        # M("List All"),
-                    # ),
+                    M("Teams", c="hrm", f="group",
+                      check=manager_mode)(
+                        M("New Team", m="create"),
+                        M("List All"),
+                    ),
                     M("National Societies", c="org", 
                                             f="organisation",
                                             vars = red_cross_filter,
@@ -289,10 +290,16 @@ class S3OptionsMenu(default.S3OptionsMenu):
                         M("Search", m="search"),
                         M("Import", m="import", p="create"),
                     ),
-                    M("Job Role Catalog", c="hrm", f="job_title",
+                    M("Department Catalog", c="hrm", f="department",
                       check=manager_mode)(
-                        M("New Job Role", m="create"),
+                        M("New", m="create"),
                         M("List All"),
+                    ),
+                    M("Job Title Catalog", c="hrm", f="job_title",
+                      check=manager_mode)(
+                        M("New Job Title", m="create"),
+                        M("List All"),
+                        M("Import", m="import", p="create", check=is_org_admin),
                     ),
                     #M("Skill Catalog", f="skill",
                       #check=manager_mode)(
@@ -320,22 +327,24 @@ class S3OptionsMenu(default.S3OptionsMenu):
                       check=manager_mode)(
                         M("New Training Course", m="create"),
                         M("List All"),
+                        M("Import", m="import", p="create", check=is_org_admin),
                         M("Course Certificates", f="course_certificate"),
                     ),
                     M("Certificate Catalog", c="hrm", f="certificate",
                       check=manager_mode)(
                         M("New Certificate", m="create"),
                         M("List All"),
+                        M("Import", m="import", p="create", check=is_org_admin),
                         #M("Skill Equivalence", f="certificate_skill"),
                     ),
-                    M("My Profile", c="hrm", f="person",
-                      check=personal_mode, vars=dict(mode="personal")),
+                    #M("My Profile", c="hrm", f="person",
+                    #  check=personal_mode, vars=dict(mode="personal")),
                     # This provides the link to switch to the manager mode:
                     M("Human Resources", c="hrm", f="index",
                       check=[personal_mode, is_org_admin]),
                     # This provides the link to switch to the personal mode:
-                    M("Personal Profile", c="hrm", f="person",
-                      check=manager_mode, vars=dict(mode="personal"))
+                    #M("Personal Profile", c="hrm", f="person",
+                    #  check=manager_mode, vars=dict(mode="personal"))
                 )
 
     # -------------------------------------------------------------------------
@@ -353,16 +362,20 @@ class S3OptionsMenu(default.S3OptionsMenu):
                                  ADMIN in s3.roles
 
         settings = current.deployment_settings
-        job_roles = lambda i: settings.get_hrm_job_roles()
+        #job_roles = lambda i: settings.get_hrm_job_roles()
         show_programmes = lambda i: settings.get_hrm_vol_experience() == "programme"
         show_tasks = lambda i: settings.has_module("project") and \
                                settings.get_project_mode_task()
         use_teams = lambda i: settings.get_hrm_use_teams()
 
-        if job_roles(""):
-            jt_catalog_label = "Job Title Catalog"
-        else:
-            jt_catalog_label = "Volunteer Role Catalog"
+        check_org_dependent_field = lambda tablename, fieldname: \
+            settings.set_org_dependent_field(tablename, fieldname,
+                                             enable_field = False)
+
+        #if job_roles(""):
+        #    jt_catalog_label = "Job Title Catalog"
+        #else:
+        jt_catalog_label = "Volunteer Role Catalog"
 
         return M(c="vol")(
                     M("Volunteers", f="volunteer",
@@ -378,11 +391,16 @@ class S3OptionsMenu(default.S3OptionsMenu):
                         M("New", m="create"),
                         M("List All"),
                     ),
-                    M("Job Role Catalog", f="job_role",
-                      check=[manager_mode, job_roles])(
+                    M("Department Catalog", f="department",
+                      check=manager_mode)(
                         M("New", m="create"),
                         M("List All"),
                     ),
+                    #M("Job Role Catalog", f="job_role",
+                    #  check=[manager_mode, job_roles])(
+                    #    M("New", m="create"),
+                    #    M("List All"),
+                    #),
                     M(jt_catalog_label, f="job_title",
                       check=manager_mode)(
                         M("New", m="create"),
@@ -421,13 +439,31 @@ class S3OptionsMenu(default.S3OptionsMenu):
                         M("List All"),
                         M("Import Hours", f="programme_hours", m="import"),
                     ),
+                    M("Volunteer Cluster Type", f="cluster_type",
+                      check = check_org_dependent_field("vol_volunteer_cluster",
+                                                        "vol_cluster_type_id"))(
+                        M("New", m="create"),
+                        M("List All"),
+                    ),
+                    M("Volunteer Cluster", f="cluster",
+                      check = check_org_dependent_field("vol_volunteer_cluster",
+                                                        "vol_cluster_id"))(
+                        M("New", m="create"),
+                        M("List All"),
+                    ),
+                    M("Volunteer Cluster Position", f="cluster_position",
+                      check = check_org_dependent_field("vol_volunteer_cluster",
+                                                        "vol_cluster_position_id"))(
+                        M("New", m="create"),
+                        M("List All"),
+                    ),
                     M("Reports", f="volunteer", m="report",
                       check=manager_mode)(
                         M("Volunteer Report", m="report"),
                         M("Training Report", f="training", m="report"),
                     ),
-                    M("My Profile", f="person",
-                      check=personal_mode, vars=dict(mode="personal")),
+                    #M("My Profile", f="person",
+                    #  check=personal_mode, vars=dict(mode="personal")),
                     M("My Tasks", f="task",
                       check=[personal_mode, show_tasks],
                       vars=dict(mode="personal",
@@ -436,8 +472,8 @@ class S3OptionsMenu(default.S3OptionsMenu):
                     M("Volunteer Management", f="index",
                       check=[personal_mode, is_org_admin]),
                     # This provides the link to switch to the personal mode:
-                    M("Personal Profile", f="person",
-                      check=manager_mode, vars=dict(mode="personal"))
+                    #M("Personal Profile", f="person",
+                    #  check=manager_mode, vars=dict(mode="personal"))
                 )
 
     # -------------------------------------------------------------------------

@@ -53,7 +53,7 @@ except ImportError:
 from gluon import *
 from gluon.storage import Storage
 
-from s3method import S3Method
+from s3rest import S3Method
 from s3import import S3ImportItem
 
 DEBUG = False
@@ -220,7 +220,6 @@ class S3Sync(S3Method):
         xml = current.xml
 
         resource_name = task.resource_name
-        prefix, name = resource_name.split("_", 1)
 
         _debug("S3Sync.__pull(%s, %s)" % (repository.url, resource_name))
 
@@ -235,7 +234,7 @@ class S3Sync(S3Method):
         last_pull = task.last_pull
 
         # Get the target resource for this task
-        resource = manager.define_resource(prefix, name)
+        resource = current.s3db.resource(resource_name)
 
         # Add msince and deleted to the URL
         if last_pull and task.update_policy not in ("THIS", "OTHER"):
@@ -413,7 +412,6 @@ class S3Sync(S3Method):
         xml = current.xml
 
         resource_name = task.resource_name
-        prefix, name = resource_name.split("_", 1)
 
         _debug("S3Sync.__push(%s, %s)" % (repository.url, resource_name))
 
@@ -444,9 +442,8 @@ class S3Sync(S3Method):
         _debug("...push to URL %s" % url)
 
         # Export the resource as S3XML
-        prefix, name = task.resource_name.split("_", 1)
-        resource = manager.define_resource(prefix, name,
-                                           include_deleted=True)
+        resource = current.s3db.resource(resource_name,
+                                         include_deleted=True)
         data = resource.export_xml(msince=last_push)
         count = resource.results or 0
         mtime = resource.muntil
@@ -1003,8 +1000,7 @@ class S3SyncLog(S3Method):
                 sync_log = current.s3db[self.TABLENAME]
                 sync_log.resource_name.readable = False
                 query = (sync_log.resource_name == resource.tablename)
-                r = current.manager.parse_request(prefix="sync", name="log",
-                                                  args=[])
+                r = r.factory(prefix="sync", name="log", args=[])
                 s3 = current.response.s3
                 s3.filter = query
                 s3.prep = None

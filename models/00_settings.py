@@ -36,9 +36,6 @@ s3.download_url = "%s/default/download" % s3.base_url
 # Global variables
 ##################
 
-# Interactive view formats
-s3.interactive_view_formats = ("html", "popup", "iframe")
-
 # Strings to i18n
 messages["UNAUTHORISED"] = "Not authorised!"
 messages["BADFORMAT"] = "Unsupported data format!"
@@ -59,6 +56,8 @@ messages["NOT_APPLICABLE"] = "N/A"
 messages["ADD_PERSON"] = "Add Person"
 messages["ADD_LOCATION"] = "Add Location"
 messages["SELECT_LOCATION"] = "Select a location"
+messages["COUNTRY"] = "Country"
+messages["ORGANISATION"] = "Organization"
 
 for u in messages:
     if isinstance(messages[u], str):
@@ -178,11 +177,10 @@ _settings.on_failed_authorization = URL(c="default", f="user",
                                         args="not_authorized")
 _settings.reset_password_requires_verification = True
 _settings.verify_email_next = URL(c="default", f="index")
-# Notify Approver of new pending user registration. Action may be required.
-_settings.verify_email_onaccept = auth.s3_verify_email_onaccept
 
 # Auth Messages
 _messages = auth.messages
+
 _messages.verify_email = "Click on the link %(url)s%(key)s to verify your email" % \
     dict(url="%s/default/user/verify_email/" % s3.base_url,
          key="%(key)s")
@@ -197,7 +195,6 @@ _messages.help_mobile_phone = T("Entering a phone number is optional, but doing 
 # Require Admin approval for self-registered users
 _settings.registration_requires_approval = settings.get_auth_registration_requires_approval()
 _messages.registration_pending = settings.get_auth_registration_pending()
-_messages.registration_pending_approval = settings.get_auth_registration_pending_approval()
 
 _messages["approve_user"] = \
 """Your action is required to approve a New User for %(system_name)s:
@@ -218,6 +215,14 @@ No action is required.""" \
 """%(first_name)s %(last_name)s
 %(email)s""")
 
+_messages["confirmation_email_subject"] = "%s %s" % (settings.get_system_name(),
+                                                     T("access granted"))
+_messages["confirmation_email"] = "%s %s %s %s. %s." % (T("Welcome to the"),
+                                                        settings.get_system_name(),
+                                                        T("Portal at"),
+                                                        s3.base_url,
+                                                        T("Thanks for your assistance"))
+
 # We don't wish to clutter the groups list with 1 per user.
 _settings.create_user_groups = False
 # We need to allow basic logins for Webservices
@@ -226,19 +231,16 @@ _settings.allow_basic_login = True
 _settings.logout_onlogout = s3_auth_on_logout
 _settings.login_onaccept = s3_auth_on_login
 _settings.login_next = settings.get_auth_login_next()
-if settings.get_auth_registration_volunteer() and \
-   settings.has_module("vol"):
+if settings.has_module("vol") and \
+   settings.get_auth_registration_volunteer():
     _settings.register_next = URL(c="vol", f="person")
 
-# Default Language for authenticated users
-_settings.table_user.language.default = settings.get_L10n_default_language()
-
 # Languages available in User Profiles
-field = _settings.table_user.language
 if len(s3.l10n_languages) > 1:
-    field.requires = IS_IN_SET(s3.l10n_languages,
-                               zero=None)
+    _settings.table_user.language.requires = IS_IN_SET(s3.l10n_languages,
+                                                       zero=None)
 else:
+    field = _settings.table_user.language
     field.default = s3.l10n_languages.keys()[0]
     field.readable = False
     field.writable = False
@@ -250,16 +252,17 @@ _settings.lock_keys = True
 ######
 
 # These settings could be made configurable as part of the Messaging Module
-# - however also need to be used by Auth (order issues), DB calls are overheads
-# - as easy for admin to edit source here as to edit DB (although an admin panel can be nice)
-mail.settings.server = settings.get_mail_server()
-mail.settings.tls = settings.get_mail_server_tls()
-mail_server_login = settings.get_mail_server_login()
-if mail_server_login:
-    mail.settings.login = mail_server_login
-mail.settings.sender = settings.get_mail_sender()
-# Email settings for registration verification
-_settings.mailer = mail
+# - however also need to be used by Auth (order issues)
+sender = settings.get_mail_sender()
+if sender:
+    mail.settings.sender = sender
+    mail.settings.server = settings.get_mail_server()
+    mail.settings.tls = settings.get_mail_server_tls()
+    mail_server_login = settings.get_mail_server_login()
+    if mail_server_login:
+        mail.settings.login = mail_server_login
+    # Email settings for registration verification and approval
+    _settings.mailer = mail
 
 #########
 # Session
@@ -357,19 +360,6 @@ s3mgr.json_formats = ["geojson", "s3json"]
 s3mgr.csv_formats = ["hrf", "s3csv"]
 
 s3mgr.ROWSPERPAGE = 20
-
-##########
-# Messages
-##########
-s3.messages = Messages(T)
-system_name = settings.get_system_name_short()
-s3.messages.confirmation_email_subject = "%s %s" % (system_name,
-                                                    T("access granted"))
-s3.messages.confirmation_email = "%s %s %s %s. %s." % (T("Welcome to the"),
-                                                       system_name,
-                                                       T("Portal at"),
-                                                       s3.base_url,
-                                                       T("Thanks for your assistance"))
 
 # Valid Extensions for Image Upload fields
 s3.IMAGE_EXTENSIONS = ["png", "PNG", "jpg", "JPG", "jpeg", "JPEG", "gif", "GIF", "tif", "TIF", "tiff", "TIFF", "bmp", "BMP", "raw", "RAW"]

@@ -24,14 +24,8 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
     OTHER DEALINGS IN THE SOFTWARE.
 """
-from gluon import current
-import unittest
+
 from tests.web2unittest import SeleniumUnitTest
-from selenium.common.exceptions import NoSuchElementException
-from s3 import s3_debug
-from tests import *
-#import unittest, re, time
-import time
 
 class AddStaffToOrganisation(SeleniumUnitTest):
     def test_hrm005_add_staff_to_organization(self):
@@ -43,6 +37,7 @@ class AddStaffToOrganisation(SeleniumUnitTest):
             @TestDoc: https://docs.google.com/spreadsheet/ccc?key=0AmB3hMcgB-3idG1XNGhhRG9QWF81dUlKLXpJaFlCMFE
             @Test Wiki: http://eden.sahanafoundation.org/wiki/DeveloperGuidelines/Testing
         """
+
         browser = self.browser
         config = self.config
         self.login(account="admin", nexturl="org/organisation")
@@ -57,7 +52,10 @@ class AddStaffToOrganisation(SeleniumUnitTest):
         browser.get("%s/org/organisation/%s/human_resource" % (config.url, org_id))
 
         self.create("hrm_human_resource", 
-                    [( "first_name",
+                    [( "site_id",
+                       "Lori (Facility)",
+                       "option"),
+                     ( "first_name",
                        "Herculano",
                        "pr_person"),
                      ( "last_name",

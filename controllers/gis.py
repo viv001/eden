@@ -124,7 +124,7 @@ def location():
             s3base.S3SearchOptionsWidget(
                 name="location_search_L0",
                 field="L0",
-                label = T("Country"),
+                label = COUNTRY,
                 cols = 3,
             ),
             s3base.S3SearchOptionsWidget(
@@ -148,7 +148,7 @@ def location():
             # NB This currently only works for locations with the country as direct parent (i.e. mostly L1s)
             #s3base.S3SearchOptionsWidget(
             #    name = "location_search_country",
-            #    label = T("Country"),
+            #    label = COUNTRY,
             #    field = "parent",
             #    cols = 2
             #),
@@ -203,9 +203,19 @@ def location():
                             ),
                     )
 
-    # Custom Method
-    s3db.set_method("gis", "location", method="parents",
-                    action=s3_gis_location_parents)
+    # Custom Methods
+    set_method = s3db.set_method
+    from s3.s3gis import S3ExportPOI
+    set_method("gis", "location",
+               method="export_poi",
+               action=S3ExportPOI())
+    from s3.s3gis import S3ImportPOI
+    set_method("gis", "location",
+               method="import_poi",
+               action=S3ImportPOI())
+    set_method("gis", "location",
+               method="parents",
+               action=s3_gis_location_parents)
 
     # Pre-processor
     # Allow prep to pass vars back to the controller
@@ -342,7 +352,7 @@ def location():
         table.addr_street.readable = table.addr_street.writable = False
 
     country = S3ReusableField("country", "string", length=2,
-                              label = T("Country"),
+                              label = COUNTRY,
                               requires = IS_NULL_OR(IS_IN_SET_LAZY(
                                     lambda: gis.get_countries(key_type="code"),
                                     zero = SELECT_LOCATION)),
@@ -350,6 +360,7 @@ def location():
                                     gis.get_country(code, key_type="code") or UNKNOWN_OPT)
 
     output = s3_rest_controller(rheader=s3db.gis_rheader,
+                                # CSV column headers, so no T()
                                 csv_extra_fields = [
                                     dict(label="Country",
                                          field=country())
@@ -1303,7 +1314,8 @@ def layer_arcrest():
         msg_list_empty=NO_LAYERS)
 
     # Custom Method
-    s3db.set_method(module, resourcename, method="enable",
+    s3db.set_method(module, resourcename,
+                    method="enable",
                     action=enable_layer)
 
     # Pre-processor
@@ -1459,7 +1471,8 @@ def layer_georss():
         msg_list_empty=NO_LAYERS)
 
     # Custom Method
-    s3db.set_method(module, resourcename, method="enable",
+    s3db.set_method(module, resourcename,
+                    method="enable",
                     action=enable_layer)
 
     # Pre-processor
@@ -1707,7 +1720,8 @@ def layer_openweathermap():
         msg_list_empty=NO_LAYERS)
 
     # Custom Method
-    s3db.set_method(module, resourcename, method="enable",
+    s3db.set_method(module, resourcename,
+                    method="enable",
                     action=enable_layer)
 
     # Pre-processor
@@ -1846,6 +1860,7 @@ def theme_data():
     """ RESTful CRUD controller """
 
     output = s3_rest_controller(csv_extra_fields = [
+                                    # CSV column headers, so no T()
                                     dict(label="Layer",
                                          field=s3db.gis_layer_theme_id())
                                 ])
@@ -1884,7 +1899,7 @@ def layer_tms():
     # Custom Method
     s3db.set_method(module, resourcename,
                     method="enable",
-                           action=enable_layer)
+                    action=enable_layer)
 
     # Pre-processor
     def prep(r):
@@ -2022,8 +2037,8 @@ def layer_wms():
 
     # Custom Method
     s3db.set_method(module, resourcename,
-                           method="enable",
-                           action=enable_layer)
+                    method="enable",
+                    action=enable_layer)
 
     # Pre-processor
     def prep(r):
@@ -2091,8 +2106,8 @@ def layer_xyz():
 
     # Custom Method
     s3db.set_method(module, resourcename,
-                           method="enable",
-                           action=enable_layer)
+                    method="enable",
+                    action=enable_layer)
 
     # Pre-processor
     def prep(r):
@@ -2277,7 +2292,7 @@ def feature_query():
     s3.filter = (table.lat != None) & (table.lon != None)
 
     # Parse the Request
-    r = s3mgr.parse_request()
+    r = s3_request()
 
     if r.representation != "geojson":
         session.error = BADFORMAT

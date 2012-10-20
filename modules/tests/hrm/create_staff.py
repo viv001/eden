@@ -25,14 +25,7 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from gluon import current
-import unittest
 from tests.web2unittest import SeleniumUnitTest
-from selenium.common.exceptions import NoSuchElementException
-from s3 import s3_debug
-from tests import *
-#import unittest, re, time
-import time
 
 class CreateStaff(SeleniumUnitTest):
     def test_hrm001_create_staff(self):
@@ -43,14 +36,15 @@ class CreateStaff(SeleniumUnitTest):
             @TestDoc: https://docs.google.com/spreadsheet/ccc?key=0AmB3hMcgB-3idG1XNGhhRG9QWF81dUlKLXpJaFlCMFE
             @Test Wiki: http://eden.sahanafoundation.org/wiki/DeveloperGuidelines/Testing
         """
+
         print "\n"
 
         self.login(account="admin", nexturl="hrm/staff/create")
 
         self.create("hrm_human_resource", 
                     [( "organisation_id",
-                       "Acme Suppliers",
-                       "autocomplete"),
+                       "International Federation of Red Cross and Red Crescent Societies (IFRC)",
+                       "option"),
                      ( "first_name",
                        "Robert",
                        "pr_person"),
@@ -67,33 +61,37 @@ class CreateStaff(SeleniumUnitTest):
                        "Warehouse Manager",
                        "option"),
                      ( "site_id",
-                       "AP Zone",
-                       "autocomplete"),
+                       "AP Zone (Office)",
+                       "option",
+                       3),
                      ]
                      )
         
 
-    def test_hrm001_create_staff_registry(self):
-        """
-            @case: HRM001
-            @description: Create a Staff from registry
-            
-            @TestDoc: https://docs.google.com/spreadsheet/ccc?key=0AmB3hMcgB-3idG1XNGhhRG9QWF81dUlKLXpJaFlCMFE
-            @Test Wiki: http://eden.sahanafoundation.org/wiki/DeveloperGuidelines/Testing
-        """
-        print "\n"
+#===============================================================================
+#    def test_hrm001_create_staff_registry(self):
+#        """
+#            @case: HRM001
+#            @description: Create a Staff from registry
+#            
+#            @TestDoc: https://docs.google.com/spreadsheet/ccc?key=0AmB3hMcgB-3idG1XNGhhRG9QWF81dUlKLXpJaFlCMFE
+#            @Test Wiki: http://eden.sahanafoundation.org/wiki/DeveloperGuidelines/Testing
+#        """
+#        print "\n"
+# 
+#        self.login(account="admin", nexturl="hrm/staff/create")
+#        self.browser.find_element_by_id("select_from_registry").click()
+#        self.create("hrm_human_resource", 
+#                    [( "organisation_id",
+#                       "Timor-Leste Red Cross Society",
+#                       "autocomplete"),
+#                     ( "person_id",
+#                       "Yakobus Maia",
+#                       "autocomplete"),
+#                     ( "site_id",
+#                       "Ainaro Branch Office",
+#                       "autocomplete")
+#                     ]
+#                     )
 
-        self.login(account="admin", nexturl="hrm/staff/create")
-        self.browser.find_element_by_id("select_from_registry").click()
-        self.create("hrm_human_resource", 
-                    [( "organisation_id",
-                       "Timor-Leste Red Cross Society",
-                       "autocomplete"),
-                     ( "person_id",
-                       "Yakobus Maia",
-                       "autocomplete"),
-                     ( "site_id",
-                       "Ainaro Branch Office",
-                       "autocomplete")
-                     ]
-                     )
+# END =========================================================================

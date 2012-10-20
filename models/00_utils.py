@@ -5,6 +5,28 @@
 """
 
 # =============================================================================
+if request.is_local:
+    # This is a request made from the local server
+
+    search_subscription = request.get_vars.get("search_subscription", None)
+    if search_subscription:
+        # We're doing a request for a saved search
+        table = s3db.pr_saved_search
+        search = db(table.auth_token == search_subscription).select(table.pe_id,
+                                                                    limitby=(0, 1)
+                                                                    ).first()
+        if search:
+            # Impersonate user
+            user_id = auth.s3_get_user_id(pe_id=search.pe_id)
+
+            if user_id:
+                # Impersonate the user who is subscribed to this saved search
+                auth.s3_impersonate(user_id)
+            else:
+                # Request is ANONYMOUS
+                auth.s3_impersonate(None)
+
+# =============================================================================
 # Check Permissions & fail as early as we can
 #
 # Set user roles
@@ -26,18 +48,29 @@ S3OptionsMenu = default_menus.S3OptionsMenu
 
 current.menu = Storage(options=None, override={})
 if auth.permission.format in ("html"):
-    menus = "applications.%s.private.templates.%s.menus" % \
-            (appname, settings.get_theme())
-    try:
-        exec("import %s as deployment_menus" % menus)
-    except ImportError:
-        pass
+    menus = None
+    theme = settings.get_theme()
+    if theme != "default":
+        # If there is a custom Theme, then attempot to load a custom menu from it
+        menus = "applications.%s.private.templates.%s.menus" % \
+                (appname, theme)
     else:
-        if "S3MainMenu" in deployment_menus.__dict__:
-            S3MainMenu = deployment_menus.S3MainMenu
+        template = settings.get_template()
+        if template != "default":
+            # If there is a custom Template, then attempt to load a custom menu from it
+            menus = "applications.%s.private.templates.%s.menus" % \
+                    (appname, template)
+    if menus:
+        try:
+            exec("import %s as deployment_menus" % menus)
+        except ImportError:
+            pass
+        else:
+            if "S3MainMenu" in deployment_menus.__dict__:
+                S3MainMenu = deployment_menus.S3MainMenu
 
-        if "S3OptionsMenu" in deployment_menus.__dict__:
-            S3OptionsMenu = deployment_menus.S3OptionsMenu
+            if "S3OptionsMenu" in deployment_menus.__dict__:
+                S3OptionsMenu = deployment_menus.S3OptionsMenu
 
     main = S3MainMenu.menu()
 else:
@@ -171,18 +204,6 @@ def s3_barchart(r, **attr):
         raise HTTP(501, body=BADFORMAT)
 
 # -----------------------------------------------------------------------------
-def s3_copy(r, **attr):
-    """
-        Copy a record
-
-        used as REST method handler for S3Resources
-
-        @todo: move into S3CRUDHandler
-    """
-
-    redirect(URL(args="create", vars={"from_record":r.id}))
-
-# -----------------------------------------------------------------------------
 def s3_rest_controller(prefix=None, resourcename=None, **attr):
     """
         Helper function to apply the S3Resource REST interface
@@ -222,47 +243,55 @@ def s3_rest_controller(prefix=None, resourcename=None, **attr):
 
         *** Callbacks:
 
-        create_onvalidation     Function/Lambda for additional record validation on create
-        create_onaccept         Function/Lambda after successful record insertion
+        create_onvalidation     Function for additional record validation on create
+        create_onaccept         Function after successful record insertion
 
-        update_onvalidation     Function/Lambda for additional record validation on update
-        update_onaccept         Function/Lambda after successful record update
+        update_onvalidation     Function for additional record validation on update
+        update_onaccept         Function after successful record update
 
         onvalidation            Fallback for both create_onvalidation and update_onvalidation
         onaccept                Fallback for both create_onaccept and update_onaccept
-        ondelete                Function/Lambda after record deletion
+        ondelete                Function after record deletion
     """
 
     # Parse the request
-    r = s3mgr.parse_request(prefix, resourcename)
+    r = s3_request(prefix, resourcename)
 
     # Set method handlers
-    r.set_handler("barchart", s3_barchart)
-    r.set_handler("compose", s3base.S3Compose())
-    r.set_handler("copy", s3_copy)
-    r.set_handler("report", s3base.S3Cube())
-    r.set_handler("import", s3base.S3Importer())
-    r.set_handler("map", s3base.S3Map())
+    method = r.method
+    set_handler = r.set_handler
+    set_handler("barchart", s3_barchart)
+    set_handler("compose", s3base.S3Compose())
+    set_handler("copy", lambda r, **attr: redirect(URL(args="create",
+                                                       vars={"from_record":r.id})))
+    set_handler("import", s3base.S3Importer())
+    set_handler("map", lambda r, **attr: s3base.S3Map()(r, **attr))
+    set_handler("report", s3base.S3Report())
 
-    # Activate record approval?
-    if deployment_settings.get_auth_record_approval():
-        prefix, name, table, tablename = r.target()
-        if "approved_by" in table.fields and \
-           s3db.get_config(tablename, "requires_approval", False):
-            r.set_handler(["approve", "reject"], s3base.S3ApproveRecords(),
-                          http = ["GET", "POST"])
-
-    # Don't load S3PDF unless needed (very slow import with reportlab)
-    if r.method == "import" and r.representation == "pdf":
+    if method == "import" and \
+       r.representation == "pdf":
+        # Don't load S3PDF unless needed (very slow import with Reportlab)
         from s3.s3pdf import S3PDF
-        r.set_handler("import", S3PDF(),
-                      http = ["GET", "POST"],
-                      representation="pdf")
+        set_handler("import", S3PDF(),
+                    http = ["GET", "POST"],
+                    representation="pdf")
+
+    # Plugin OrgRoleManager where appropriate
+    if r.record and auth.user is not None and \
+       r.tablename in s3base.S3OrgRoleManager.ENTITY_TYPES:
+
+        sr = auth.get_system_roles()
+        realms = auth.user.realms or Storage()
+
+        if sr.ADMIN in realms or sr.ORG_ADMIN in realms and \
+           (realms[sr.ORG_ADMIN] is None or \
+            r.record.pe_id in realms[sr.ORG_ADMIN]):
+            r.set_handler("roles", s3base.S3OrgRoleManager())
 
     # Execute the request
     output = r(**attr)
 
-    if isinstance(output, dict) and (not r.method or r.method in ("report", "search")):
+    if isinstance(output, dict) and (not method or method in ("report", "search")):
         if s3.actions is None:
 
             # Add default action buttons
@@ -313,7 +342,7 @@ def s3_rest_controller(prefix=None, resourcename=None, **attr):
                 add_btn = A(label, _href=url, _class="action-btn")
                 output.update(add_btn=add_btn)
 
-    elif r.method not in ("import", "approve", "reject"):
+    elif method not in ("import", "review", "approve", "reject"):
         s3.actions = None
 
     return output

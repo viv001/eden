@@ -1,11 +1,13 @@
-__all__ = ["login", "logout", "register"]
+__all__ = ["login",
+           "logout",
+           "register"
+           ]
 
-# Selenium WebDriver
-from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
-#from selenium.webdriver.common.keys import Keys
+
 from gluon import current
 from gluon.storage import Storage
+
 from .core_utils import *
 
 current.data = Storage()
@@ -42,8 +44,11 @@ def login(reporter, account="normal", nexturl=None):
         raise NotImplementedError
 
     # If the user is already logged in no need to do anything so return
+    # auth_menu_email is used by the default template
+    # username fright is used by the IFRC template 
     if browser.page_source != None and \
-       browser.page_source.find("<a id=\"auth_menu_email\">%s</a>" % email) > 0:
+       (browser.page_source.find("<a id=\"auth_menu_email\">%s</a>" % email) > 0 or
+        browser.page_source.find("<div class=\"username fright\">%s</div>" % email) > 0):
         # If the URL is different then move to the new URL
         if not browser.current_url.endswith(nexturl):
             url = "%s/%s" % (config.url, nexturl)

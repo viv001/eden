@@ -25,7 +25,6 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from gluon import current
 from tests.web2unittest import SeleniumUnitTest
 
 class CreateAsset(SeleniumUnitTest):
@@ -37,37 +36,40 @@ class CreateAsset(SeleniumUnitTest):
             @Test Doc: https://docs.google.com/a/aidiq.com/spreadsheet/ccc?key=0AmB3hMcgB-3idG1XNGhhRG9QWF81dUlKLXpJaFlCMFE#gid=2
             @Test Wiki: http://eden.sahanafoundation.org/wiki/DeveloperGuidelines/Testing
         """
-        import datetime
-        from dateutil.relativedelta import relativedelta
 
-        #@ToDo: Move these into we2unittest
-        today = datetime.date.today().strftime("%Y-%m-%d")
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        now_1_day = (datetime.datetime.now() + relativedelta( days = +1 )).strftime("%Y-%m-%d %H:%M:%S")
-        now_1_week = (datetime.date.today() + relativedelta( weeks = +1 )).strftime("%Y-%m-%d %H:%M:%S")
-        
+        today = self.today()
+        now = self.now()
+        now_1_day = self.now_1_day()
+        now_1_week = self.now_1_week()
+
         # Login, if not-already done so
         self.login(account="admin", nexturl="asset/asset/create")
-        
+
         self.create("asset_asset", 
                     [( "number",
                        "WS_100_17"),
                      ( "item_id",
                        "Blankets",
-                       "autocomplete"),
+                       "option"),
+                     ("organisation_id", 
+                      "International Federation of Red Cross and Red Crescent Societies (IFRC)", 
+                      "option"),
                      ( "site_id",
                        "AP Zone",
-                       "option"),
+                       "option",
+                        4),
                      ( "sn",
                        "WPU-4536-9381"),
-                     ( "supplier",
-                       "Breville"),
+                     ( "supply_org_id",
+                       "Acme Suppliers",
+                       "option"),
                      ( "purchase_date",
-                       today ),
+                       today),
                      ( "purchase_price",
                        8),
                      ( "purchase_currency",
-                       "USD"),
+                       "USD",
+                       "option"),
                      ( "comments",
                        "Test Asset")]
                      )
@@ -83,10 +85,10 @@ class CreateAsset(SeleniumUnitTest):
 #                     ( "datetime",
 #                       now),
                      ( "organisation_id",
-                       "Timor-Leste Red Cross Society",
-                       "facility_widget"),
+                       "Timor-Leste Red Cross Society (CVTL)",
+                       "option"),
                      ( "site_id",
-                       "Lori",
+                       "Lori (Facility)",
                        "option",
                        3),
                      ( "cond",

@@ -523,12 +523,14 @@ class SyncDataModel(S3Model):
         except:
             return
 
+        sync = current.sync
+
         if repository_id:
             rtable = current.s3db.sync_repository
             query = (rtable.id == repository_id)
             repository = current.db(query).select(limitby=(0, 1)).first()
             if repository and repository.url:
-                success = current.manager.sync.request_registration(repository)
+                success = sync.request_registration(repository)
                 if not success:
                     current.response.warning = \
                         current.T("Could not auto-register at the repository, please register manually.")
@@ -566,8 +568,13 @@ class SyncRepositoryVirtualFields:
     def last_pull_time(self):
         """ Last pull synchronization date/time for this repository """
 
+        try:
+            repository_id = self.sync_repository.id
+        except AttributeError:
+            return "-"
+
         table = current.s3db.sync_task
-        query = (table.repository_id == self.sync_repository.id)
+        query = (table.repository_id == repository_id)
         task = current.db(query).select(orderby=~table.last_pull,
                                         limitby=(0,1)).first()
         if task:
@@ -578,8 +585,13 @@ class SyncRepositoryVirtualFields:
     def last_push_time(self):
         """ Last push synchronization date/time for this repository """
 
+        try:
+            repository_id = self.sync_repository.id
+        except AttributeError:
+            return "-"
+
         table = current.s3db.sync_task
-        query = (table.repository_id == self.sync_repository.id)
+        query = (table.repository_id == repository_id)
         task = current.db(query).select(orderby=~table.last_push,
                                         limitby=(0,1)).first()
         if task:
@@ -655,7 +667,7 @@ def sync_now(r, **attr):
     output = dict(title=T("Manual Synchronization"), rheader=rheader)
     s3task = current.s3task
 
-    sync = S3Sync()
+    sync = current.sync
 
     if not auth.s3_logged_in():
         auth.permission.fail()

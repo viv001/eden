@@ -55,7 +55,7 @@ settings.base.template = "default"
 # Switch to "False" in Production for a Performance gain
 # (need to set to "True" again when Table definitions are changed)
 settings.base.migrate = True
-# To just create the .table files:
+# To just create the .table files (also requires migrate=True):
 #settings.base.fake_migrate = True
 
 # Set this to True to switch to Debug mode
@@ -79,11 +79,11 @@ settings.auth.hmac_key = "akeytochange"
 #settings.mail.server = "smtp.gmail.com:587"
 #settings.mail.tls = True
 #settings.mail.login = "username:password"
-# From Address
-settings.mail.sender = "'Sahana' <sahana@your.org>"
+# From Address - until this is set, no mails can be sent
+#settings.mail.sender = "'Sahana' <sahana@example.org>"
 # Default email address to which requests to approve new user accounts gets sent
 # This can be overridden for specific domains/organisations via the auth_domain table
-settings.mail.approver = "useradmin@your.org"
+#settings.mail.approver = "useradmin@example.org"
 # Daily Limit on Sending of emails
 #settings.mail.limit = 1000
 
@@ -105,6 +105,9 @@ settings.frontpage.rss = [
 
 # Enable session store in Memcache to allow sharing of sessions across instances
 #settings.base.session_memcache = '127.0.0.1:11211'
+
+# Allow language files to be updated automatically
+#settings.L10n.languages_readonly = False
 
 # Fill these to allow users to Login using Facebook
 # https://developers.facebook.com/apps
@@ -134,8 +137,8 @@ settings.frontpage.rss = [
 # Register an app at http://twitter.com/apps
 # (select Aplication Type: Client)
 # You'll get your consumer_key and consumer_secret from Twitter
-#settings.msg_twitter_oauth_consumer_key = ""
-#settings.msg_twitter_oauth_consumer_secret = ""
+#settings.msg.twitter_oauth_consumer_key = ""
+#settings.msg.twitter_oauth_consumer_secret = ""
 
 # UI options
 # Should user be prompted to save before navigating away?

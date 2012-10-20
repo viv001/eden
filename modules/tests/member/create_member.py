@@ -27,7 +27,6 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from gluon import current
 from tests.web2unittest import SeleniumUnitTest
 
 class CreateMember(SeleniumUnitTest):
@@ -37,14 +36,16 @@ class CreateMember(SeleniumUnitTest):
             @description: Create Member
 
         """
+
         print "\n"
-        
+
+        today = self.today()
 
         self.login(account="admin", nexturl="member/membership/create")
         self.create("member_membership", 
                     [( "organisation_id",
-                       "Timor-Leste Red Cross Society",
-                       "autocomplete"),
+                       "Timor-Leste Red Cross Society (CVTL)",
+                       "option"),
                      ( "first_name",
                        "Denise",
                        "pr_person"),
@@ -52,40 +53,43 @@ class CreateMember(SeleniumUnitTest):
                        "Grey",
                        "pr_person"),
                      ( "email",
-                       "denise.grey@cvtl.tl",
+                       "denise.grey3@cvtl.tl",
                        "pr_person"),
                      ( "start_date",
-                       "2012-11-01",),
+                       today,),
                      ( "membership_fee",
                        "10.00"),
                      ( "membership_paid",
-                       "2012-11-01")]
+                       today)]
                      )
         
 
-    def test_mem001_create_member_registry(self):
-        """
-            @case: mem001
-            @description: Create Member from registery
-
-        """
-        print "\n"               
-
-        self.login(account="admin", nexturl="member/membership/create")
-        self.browser.find_element_by_id("select_from_registry").click()
-        self.create("member_membership", 
-                    [( "person_id",
-                       "Beatriz Albuquequer",
-                       "autocomplete"),
-                     ( "organisation_id",
-                       "Timor-Leste Red Cross Society",
-                       "autocomplete"),
-                     ( "start_date",
-                       "2012-09-01"),
-                     ( "membership_fee",
-                       "10.00"),
-                     ( "membership_paid",
-                       "2012-09-01")]
-                     )
+#    def test_mem001_create_member_registry(self):
+#        """
+#            @case: mem001
+#            @description: Create Member from registery
+#
+#        """
+#        print "\n"   
+#                    
+#        today = self.today()
+#
+#        self.login(account="admin", nexturl="member/membership/create")
+#        self.browser.find_element_by_id("select_from_registry").click()
+#        
+#        self.create("member_membership", 
+#                    [( "person_id",
+#                       "Beatriz Albuquequer",
+#                       "autocomplete"),
+#                     ( "organisation_id",
+#                       "Timor-Leste Red Cross Society",
+#                       "autocomplete"),
+#                     ( "start_date",
+#                       today),
+#                     ( "membership_fee",
+#                       "10.00"),
+#                     ( "membership_paid",
+#                       today)]
+#                     )
       
         

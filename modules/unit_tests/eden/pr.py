@@ -3,13 +3,15 @@
 # PR Unit Tests
 #
 # To run this script use:
-# python web2py.py -S eden -M -R applications/eden/tests/unit_tests/modules/eden/pr.py
+# python web2py.py -S eden -M -R applications/eden/modules/unit_tests/eden/pr.py
 #
 import unittest
 import datetime
 
 from gluon import *
 from gluon.storage import Storage
+
+from eden.pr import S3SavedSearch
 
 # =============================================================================
 class PRTests(unittest.TestCase):
@@ -187,7 +189,8 @@ class PersonDeduplicateTests(unittest.TestCase):
 
         deduplicate = s3db.get_config("pr_person", "deduplicate")
 
-        # Test Match
+        # Test Match:
+        # Same first name and last name, no email in either record
         person = Storage(first_name = "Test",
                          last_name = "UserDEDUP")
         item = self.import_item(person)
@@ -195,7 +198,8 @@ class PersonDeduplicateTests(unittest.TestCase):
         self.assertEqual(item.id, self.person1_id)
         self.assertEqual(item.method, S3ImportItem.METHOD.UPDATE)
 
-        # Test Mismatch
+        # Test Mismatch:
+        # Different first name, same last name
         person = Storage(first_name = "Other",
                          last_name = "UserDEDUP")
         item = self.import_item(person)
@@ -212,7 +216,9 @@ class PersonDeduplicateTests(unittest.TestCase):
 
         # Test without contact records in the DB
 
-        # Test Match
+        # Test Match:
+        # Same first and last name,
+        # no email in the DB but in the import item
         person = Storage(first_name = "Test",
                          last_name = "UserDEDUP")
         item = self.import_item(person, email="testuser@example.com")
@@ -221,6 +227,8 @@ class PersonDeduplicateTests(unittest.TestCase):
         self.assertEqual(item.method, S3ImportItem.METHOD.UPDATE)
 
         # Test Mismatch
+        # Different first name, same last name,
+        # no email in the DB but in the import item
         person = Storage(first_name = "Other",
                          last_name = "UserDEDUP")
         item = self.import_item(person, email="testuser@example.com")
@@ -249,15 +257,41 @@ class PersonDeduplicateTests(unittest.TestCase):
         self.assertEqual(item.id, self.person1_id)
         self.assertEqual(item.method, S3ImportItem.METHOD.UPDATE)
 
-        # Test Match - same names, different email
+        # Test Mismatch - same names, no email in import item
         person = Storage(first_name = "Test",
                          last_name = "UserDEDUP")
+        item = self.import_item(person)
+        deduplicate(item)
+        self.assertNotEqual(item.id, self.person1_id)
+        self.assertNotEqual(item.id, self.person2_id)
+
+        # Test Match - same names, no email in import item, but matching DOB
+        person = Storage(first_name = "Test",
+                         last_name = "UserDEDUP",
+                         date_of_birth = datetime.date(1974, 4, 13))
+        item = self.import_item(person)
+        deduplicate(item)
+        self.assertEqual(item.id, self.person1_id)
+        self.assertEqual(item.method, S3ImportItem.METHOD.UPDATE)
+
+        # Test Mismatch - same names, different email
+        person = Storage(first_name = "Test",
+                         last_name = "UserDEDUP")
+        item = self.import_item(person, email="otheremail@example.com")
+        deduplicate(item)
+        self.assertNotEqual(item.id, self.person1_id)
+        self.assertNotEqual(item.id, self.person2_id)
+
+        # Test Match - same names, different email, but matching DOB
+        person = Storage(first_name = "Test",
+                         last_name = "UserDEDUP",
+                         date_of_birth = datetime.date(1974, 4, 13))
         item = self.import_item(person, email="otheremail@example.com")
         deduplicate(item)
         self.assertEqual(item.id, self.person1_id)
         self.assertEqual(item.method, S3ImportItem.METHOD.UPDATE)
 
-        # Test Match - same names, same email, but different record
+        # Test Match - same names, same email, but other record
         person = Storage(first_name = "Test",
                          last_name = "UserDEDUP")
         item = self.import_item(person, email="otheruser@example.org")
@@ -390,6 +424,61 @@ class PersonDeduplicateTests(unittest.TestCase):
         self.pe_id = None
         self.person_id = None
 
+
+class SavedSearchTests(unittest.TestCase):
+    """
+        Test the saved search validation and save functions
+    """
+    def setUp(self):
+        s3db = current.s3db
+
+        ptable = s3db.pr_person
+        stable = s3db.pr_saved_search
+
+        person = Storage(
+            first_name = "Test",
+            last_name = "SavedSearch",
+        )
+        person_id = ptable.insert(**person)
+        person.update(id=person_id)
+        s3db.update_super(ptable, person)
+
+        self.person_id = person_id
+        self.pe_id = s3db.pr_get_pe_id(ptable, person_id)
+
+    def testOnValidation(self):
+        f = S3SavedSearch.pr_saved_search_onvalidation
+
+    def testFriendlyQuery(self):
+        app = current.request.application
+        f = S3SavedSearch.friendly_string_from_field_query
+
+        result = f(
+            "org",
+            "organisation",
+            "/%s/org/organisation/search?organisation.country__belongs=NZ" % app,
+        )
+        self.assertEqual(
+            "Home Country=New Zealand",
+            result,
+        )
+
+        result = f(
+            "org",
+            "organisation",
+            "/%s/org/organisation/search?parent.acronym%%7Cparent.name%%7Cacronym%%7Cname__like=%%2Atest%%2A" % app,
+        )
+        self.assertEqual(
+            "Acronym|Name|Acronym|Name=*test*",
+            result,
+        )
+
+    def tearDown(self):
+        current.db.rollback()
+        self.pe_id = None
+        self.person_id = None
+
+
 # =============================================================================
 def run_suite(*test_classes):
     """ Run the test suite """
@@ -408,6 +497,7 @@ if __name__ == "__main__":
     run_suite(
         PRTests,
         PersonDeduplicateTests,
+        SavedSearchTests,
     )
 
 # END ========================================================================

@@ -25,14 +25,7 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from gluon import current
-import unittest
 from tests.web2unittest import SeleniumUnitTest
-from selenium.common.exceptions import NoSuchElementException
-from s3 import s3_debug
-from tests import *
-#import unittest, re, time
-import time
 
 class CreateStaffTraining(SeleniumUnitTest):
     def test_hrm003_create_staff_training(self):
@@ -69,8 +62,8 @@ class CreateStaffTraining(SeleniumUnitTest):
                      ( "hours",
                        "12"),
                      ( "site_id",
-                       "Bucharest RFAAT Centre",
-                       "autocomplete"),
+                       "AP Zone (Office)",
+                       "option"),
                      ( "comments",
                        "Testing comments"),
                      ]

@@ -1,3 +1,30 @@
+""" Sahana Eden Test Framework
+
+    @copyright: 2011-2012 (c) Sahana Software Foundation
+    @license: MIT
+
+    Permission is hereby granted, free of charge, to any person
+    obtaining a copy of this software and associated documentation
+    files (the "Software"), to deal in the Software without
+    restriction, including without limitation the rights to use,
+    copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following
+    conditions:
+
+    The above copyright notice and this permission notice shall be
+    included in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+    OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+    OTHER DEALINGS IN THE SOFTWARE.
+"""
+
 from time import time
 try:
     from cStringIO import StringIO    # Faster, where available
@@ -15,8 +42,8 @@ except ImportError:
     raise NameError("Twill not installed")
 try:
     import mechanize
-#    from mechanize import BrowserStateError
-#    from mechanize import ControlNotFoundError
+    #from mechanize import BrowserStateError
+    #from mechanize import ControlNotFoundError
 except ImportError:
     raise NameError("Mechanize not installed")
 
@@ -38,13 +65,15 @@ class BrokenLinkTest(Web2UnitTest):
         self.include_ignore = ("_language=",
                                "logout",
                                "appadmin",
-                               "admin"
+                               "admin",
+                               "delete",
                               )
         # tuple of strings that should be removed from the URL before storing
         # Typically this will be some variables passed in via the URL 
         self.strip_url = ("?_next=",
                           )
         self.maxDepth = 16 # sanity check
+        self.threshold = 10
         self.setUser("test@example.com/eden")
         self.linkDepth = []
 
@@ -105,6 +134,8 @@ class BrokenLinkTest(Web2UnitTest):
             The test can also display an histogram depicting the number of
             links found at each depth.
         """
+        self.threasholdLink = []
+        self.linktimes = []
         for user in self.credentials:
             self.clearRecord()
             if self.login(user):
@@ -124,7 +155,9 @@ class BrokenLinkTest(Web2UnitTest):
             to_visit = self.visit(to_visit, depth)
             msg = "%.2d Visited %s in %.3f seconds, %d more urls found" % (depth, url_visited, time()-visit_start, len(to_visit))
             self.reporter(msg)
-            if self.config.verbose == 2:
+            if self.config.verbose >= 2:
+                if self.config.verbose >= 3:
+                    print >> self.stdout
                 if self.stdout.isatty(): # terminal should support colour
                     msg = "%.2d Visited \033[1;32m%s\033[0m in %.3f seconds, \033[1;31m%d\033[0m more urls found" % (depth, url_visited, time()-visit_start, len(to_visit))
                 print >> self.stdout, msg
@@ -160,14 +193,28 @@ class BrokenLinkTest(Web2UnitTest):
                     break
             try:
                 if open_novisit:
+                    visit_start = time()
                     self.b._journey("open_novisit", visited_url)
                     http_code = self.b.get_code()
                     if http_code != 200: # an error situation
                         self.b.go(visited_url)
                         http_code = self.b.get_code()
+                    duration = time() - visit_start
+                    self.linktimes.append(duration)
+                    if duration > self.threshold:
+                        self.threasholdLink.append((visited_url, duration))
+                        if self.config.verbose >= 3:
+                            print >> self.stdout, "%s took %.3f seconds" % (visited_url, duration)
                 else:
+                    visit_start = time()
                     self.b.go(visited_url)
                     http_code = self.b.get_code()
+                    duration = time() - visit_start
+                    self.linktimes.append(duration)
+                    if duration > self.threshold:
+                        self.threasholdLink.append((visited_url, duration))
+                        if self.config.verbose >= 3:
+                            print >> self.stdout, "%s took %.3f seconds" % (visited_url, duration)
             except Exception as e:
                 import traceback
                 print traceback.format_exc()
@@ -255,6 +302,16 @@ class BrokenLinkTest(Web2UnitTest):
                                                   )
                 )
             n += 1
+        for (visited_url, duration) in self.threasholdLink:
+            self.reporter( "%s took %.3f seconds" % (visited_url, duration))
+
+        import numpy
+        self.reporter("Time Analysis")
+        total = len(self.linktimes)
+        average = numpy.mean(self.linktimes)
+        std = numpy.std(self.linktimes)
+        msg = "%s links visited with an average time of %s and standard deviation of %s" % (total, average, std)
+        self.reporter(msg)
 
     def report_link_depth(self):
         """

@@ -25,14 +25,7 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from gluon import current
-import unittest
 from tests.web2unittest import SeleniumUnitTest
-from selenium.common.exceptions import NoSuchElementException
-from s3 import s3_debug
-from tests import *
-#import unittest, re, time
-import time
 
 class CreateVolunteerTraining(SeleniumUnitTest):
     def test_hrm003_create_volunteer_training(self):
@@ -65,8 +58,8 @@ class CreateVolunteerTraining(SeleniumUnitTest):
                        "Emergency First Aid",
                        "option"),
                      ( "site_id",
-                       "AP Zone",
-                       "autocomplete"),
+                       "AP Zone (Office)",
+                       "option"),
                      ( "start_date",
                        "2012-04-11"),
                      ( "end_date",

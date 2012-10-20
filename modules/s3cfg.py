@@ -52,7 +52,6 @@ class S3Config(Storage):
         self.frontpage.rss = []
         self.fin = Storage()
         self.L10n = Storage()
-        self.aaa = Storage()
         self.mail = Storage()
         self.msg = Storage()
         self.options = Storage()
@@ -84,12 +83,9 @@ class S3Config(Storage):
         """
             Execute the template
         """
-        #from gluon.compileapp import build_environment
         from gluon.fileutils import read_file
         from gluon.restricted import restricted
-        #environment = build_environment(request, response, session)
         code = read_file(path)
-        #restricted(code, environment, layer=path)
         restricted(code, layer=path)
         return
 
@@ -112,7 +108,7 @@ class S3Config(Storage):
     # Auth settings
     def get_auth_hmac_key(self):
         """
-            salt to encrypt passwords - normally randmosied during 1st run
+            salt to encrypt passwords - normally randomised during 1st run
         """
         return self.auth.get("hmac_key", "akeytochange")
 
@@ -168,9 +164,9 @@ class S3Config(Storage):
     def get_auth_registration_requests_organisation(self):
         " Have the registration form request the Organisation "
         return self.auth.get("registration_requests_organisation", False)
-    def get_auth_registration_organisation_mandatory(self):
-        " Make the selection of Organisation Mandatory during registration "
-        return self.auth.get("registration_organisation_mandatory", False)
+    def get_auth_registration_organisation_required(self):
+        " Make the selection of Organisation required during registration "
+        return self.auth.get("registration_organisation_required", False)
     def get_auth_registration_organisation_hidden(self):
         " Hide the Organisation field in the registration form unless an email is entered which isn't whitelisted "
         return self.auth.get("registration_organisation_hidden", False)
@@ -190,6 +186,12 @@ class S3Config(Storage):
         else:
             organisation_id = None
         return organisation_id
+    def get_auth_registration_requests_site(self):
+        " Have the registration form request the Site "
+        return self.auth.get("registration_requests_site", False)
+    def get_auth_registration_site_required(self):
+        " Make the selection of site required during registration "
+        return self.auth.get("registration_site_required", False)
     def get_auth_registration_pending(self):
         """ Message someone gets when they register & they need approving """
         return self.auth.get("registration_pending",
@@ -204,7 +206,10 @@ class S3Config(Storage):
         """ Have the registration form request an Image """
         return self.auth.get("registration_requests_image", False)
     def get_auth_registration_roles(self):
-        """ The list of role UUIDs to assign to newly-registered users """
+        """
+            A dictionary of realms, with lists of role UUIDs, to assign to newly-registered users
+            Use key = 0 to have the roles not restricted to a realm
+        """
         return self.auth.get("registration_roles", [])
     def get_auth_registration_volunteer(self):
         """ Redirect the newly-registered user to their volunteer details page """
@@ -214,17 +219,31 @@ class S3Config(Storage):
     def get_auth_record_approval(self):
         """ Use record approval (False by default) """
         return self.auth.get("record_approval", False)
-    def get_auth_record_approver_role(self):
-        """ UID of the record approver role """
-        return self.auth.get("record_approver_role", "APPROVER")
-
-    def get_aaa_role_modules(self):
+    def get_auth_record_approval_required_for(self):
+        """ Which tables record approval is required for """
+        return self.auth.get("record_approval_required_for", None)
+    def get_auth_realm_entity(self):
+        """ Hook to determine the owner entity of a record """
+        return self.auth.get("realm_entity", None)
+    def get_auth_person_realm_human_resource_site_then_org(self):
+        """
+            Should we set pr_person.realm_entity to that of
+            hrm_human_resource.site_id$pe_id
+        """
+        return self.auth.get("person_realm_human_resource_site_then_org", False)
+    def get_auth_person_realm_member_org(self):
+        """
+            Sets pr_person.realm_entity to
+            organisation.pe_id of member_member
+        """
+        return self.auth.get("person_realm_member_org", False)
+    def get_auth_role_modules(self):
         """
             Which modules are includes in the Role Manager
             - to assign discrete permissions to via UI
         """
         T = current.T
-        return self.aaa.get("role_modules", OrderedDict([
+        return self.auth.get("role_modules", OrderedDict([
             ("staff", "Staff"),
             ("vol", "Volunteers"),
             ("member", "Members"),
@@ -234,12 +253,12 @@ class S3Config(Storage):
             ("survey", "Assessments"),
             ("irs", "Incidents")
         ]))
-    def get_aaa_access_levels(self):
+    def get_auth_access_levels(self):
         """
             Access levels for the Role Manager UI
         """
         T = current.T
-        return self.aaa.get("access_levels", OrderedDict([
+        return self.auth.get("access_levels", OrderedDict([
             ("reader", "Reader"),
             ("data_entry", "Data Entry"),
             ("editor", "Editor"),
@@ -291,9 +310,9 @@ class S3Config(Storage):
     # -------------------------------------------------------------------------
     # Database settings
     def get_database_type(self):
-        return self.database.get("db_type", "sqlite")
+        return self.database.get("db_type", "sqlite").lower()
     def get_database_string(self):
-        db_type = self.database.get("db_type", "sqlite")
+        db_type = self.database.get("db_type", "sqlite").lower()
         pool_size = self.database.get("pool_size", 30)
         if (db_type == "sqlite"):
             db_string = "sqlite://storage.db"
@@ -396,6 +415,13 @@ class S3Config(Storage):
         return self.gis.get("marker_max_width", 30)
     def get_gis_mouse_position(self):
         return self.gis.get("mouse_position", "normal")
+    def get_gis_poi_resources(self):
+        """
+            List of resources (tablenames) to import/export as PoIs from Admin Locations
+            - KML & OpenStreetMap formats
+        """
+        return self.gis.get("poi_resources",
+                            ["cr_shelter", "hms_hospital", "org_office"])
     def get_gis_print_service(self):
         return self.gis.get("print_service", "")
     def get_gis_geoserver_url(self):
@@ -467,7 +493,7 @@ class S3Config(Storage):
         return self.L10n.get("time_format", T("%H:%M:%S"))
     def get_L10n_datetime_format(self):
         T = current.T
-        return self.L10n.get("datetime_format", T("%Y-%m-%d %H:%M:%S"))
+        return self.L10n.get("datetime_format", T("%Y-%m-%d %H:%M"))
     def get_L10n_utc_offset(self):
         return self.L10n.get("utc_offset", "UTC +0000")
     def get_L10n_lat_lon_format(self):
@@ -481,6 +507,8 @@ class S3Config(Storage):
             - %f -- Degrees in decimal (double)
         """
         return self.L10n.get("lat_lon_display_format", "%f")
+    def get_L10n_languages_readonly(self):
+        return self.L10n.get("languages_readonly", True)
     def get_L10n_mandatory_lastname(self):
         return self.L10n.get("mandatory_lastname", False)
     def get_L10n_thousands_separator(self):
@@ -518,6 +546,7 @@ class S3Config(Storage):
     # UI Settings
     def get_ui_navigate_away_confirm(self):
         return self.ui.get("navigate_away_confirm", True)
+
     def get_ui_confirm(self):
         """
             For Delete actions
@@ -529,43 +558,40 @@ class S3Config(Storage):
     def get_ui_autocomplete(self):
         """ Currently Unused """
         return self.ui.get("autocomplete", False)
+
     def get_ui_read_label(self):
         """
             Label for buttons in list views which lead to a Read-opnly 'Display' view
         """
         return self.ui.get("read_label", "Open")
+
     def get_ui_update_label(self):
         """
             Label for buttons in list views which lead to a Read-opnly 'Display' view
         """
         return self.ui.get("update_label", "Open")
+
     def get_ui_cluster(self):
         """ UN-style deployment? """
         return self.ui.get("cluster", False)
+
     def get_ui_camp(self):
         """ 'Camp' instead of 'Shelter'? """
         return self.ui.get("camp", False)
+
     def get_ui_label_mobile_phone(self):
         """
             Label for the Mobile Phone field
             e.g. 'Cell Phone'
         """
-        T = current.T
-        label = self.ui.get("label_mobile_phone", T("Mobile Phone"))
-        # May need this form for Web Setup
-        #return T(label)
-        return label
+        return current.T(self.ui.get("label_mobile_phone", "Mobile Phone"))
 
     def get_ui_label_postcode(self):
         """
             Label for the Postcode field
             e.g. 'ZIP Code'
         """
-        T = current.T
-        label = self.ui.get("label_postcode", T("Postcode"))
-        # May need this form for Web Setup
-        #return T(label)
-        return label
+        return current.T(self.ui.get("label_postcode", "Postcode"))
 
     def get_ui_social_buttons(self):
         """ Display social media Buttons in the footer? """
@@ -587,11 +613,20 @@ class S3Config(Storage):
         """
         return self.mail.get("tls", False)
     def get_mail_sender(self):
-        return self.mail.get("sender", "sahana@your.org")
+        """
+            The From Address for all Outbound Emails
+        """
+        return self.mail.get("sender", None)
     def get_mail_approver(self):
-        return self.mail.get("approver", "useradmin@your.org")
+        """
+            The default Address to send Requests for New Users to be Approved
+            - unless overridden by per-domain entries in auth_organsiation
+        """
+        return self.mail.get("approver", "useradmin@example.org")
     def get_mail_limit(self):
-        """ A daily limit to the number of messages which can be sent """
+        """
+            A daily limit to the number of messages which can be sent
+        """
         return self.mail.get("limit", None)
 
     # -------------------------------------------------------------------------
@@ -605,9 +640,9 @@ class S3Config(Storage):
     # -------------------------------------------------------------------------
     # Twitter
     def get_msg_twitter_oauth_consumer_key(self):
-        return self.twitter.get("oauth_consumer_key", "")
+        return self.msg.get("twitter_oauth_consumer_key", "")
     def get_msg_twitter_oauth_consumer_secret(self):
-        return self.twitter.get("oauth_consumer_secret", "")
+        return self.msg.get("twitter_oauth_consumer_secret", "")
 
     # -------------------------------------------------------------------------
     # Save Search and Subscription
@@ -623,15 +658,72 @@ class S3Config(Storage):
     # -------------------------------------------------------------------------
     # Alert
     def get_cap_identifier_prefix(self):
+        """
+            Prefix to be prepended to identifiers of CAP alerts
+        """
         return self.cap.get("identifier_prefix", "")
 
     def get_cap_identifier_suffix(self):
+        """
+            Suffix to be appended to identifiers of CAP alerts
+        """
         return self.cap.get("identifier_suffix", "")
+
+    def get_cap_codes(self):
+        """
+            Default codes for CAP alerts
+
+            should return a list of dicts:
+            [ {"key": "<ValueName>, "value": "<Value>",
+               "comment": "<Help string>", "mutable": True|False},
+              ...]
+        """
+        return self.cap.get("codes", [])
+
+    def get_cap_event_codes(self):
+        """
+            Default alert codes for CAP info segments
+
+            should return a list of dicts:
+            [ {"key": "<ValueName>, "value": "<Value>",
+               "comment": "<Help string>", "mutable": True|False},
+              ...]
+        """
+        return self.cap.get("event_codes", [])
+
+    def get_cap_parameters(self):
+        """
+            Default parameters for CAP info segments
+
+            should return a list of dicts:
+            [ {"key": "<ValueName>, "value": "<Value>",
+               "comment": "<Help string>", "mutable": True|False},
+              ...]
+        """
+        return self.cap.get("parameters", [])
+
+    def get_cap_geocodes(self):
+        """
+            Default geocodes.
+
+            should return a list of dicts:
+            [ {"key": "<ValueName>, "value": "<Value>",
+               "comment": "<Help string>", "mutable": True|False},
+              ...]
+        """
+        return self.cap.get("geocodes", [])
+
+    def get_cap_base64(self):
+        """
+            Should CAP resources be base64 encoded and embedded in the alert message?
+        """
+        return self.cap.get("base64", False)
 
     def get_cap_languages(self):
         """
-            Languages for cap info. This gets filled in the drop-down for
-            selecting languages. These values should conform to RFC 3066.
+            Languages for CAP info segments.
+            This gets filled in the drop-down for selecting languages.
+            These values should conform to RFC 3066.
 
             For a full list of languages and their codes, see:
                 http://www.i18nguy.com/unicode/language-identifiers.html
@@ -647,6 +739,22 @@ class S3Config(Storage):
                                 ("es", "Español")
                             ]))
 
+    def get_cap_priorities(self):
+        """
+            Settings for CAP priorities
+
+            Should be an ordered dict of the format
+            OrderedDict([
+                            ("<value>, "<Translated title>", <urgency>, <severity>, <certainty>, <color>),
+                             ...
+                        ]) """
+        T = current.T
+        return self.cap.get("priorities", [
+                                            ("Urgent", T("Urgent"), "Immediate", "Extreme", "Observed", "red"),
+                                            ("High", T("High"), "Expected", "Severe", "Observed", "orange"),
+                                            ("Low", T("Low"), "Expected", "Moderate", "Observed", "green")
+                                          ])
+
     # -------------------------------------------------------------------------
     # Human Resource Management
     def get_hrm_email_required(self):
@@ -659,7 +767,7 @@ class S3Config(Storage):
         """
             If set to True then HRM records are deletable rather than just being able to be marked as obsolete
         """
-        return self.hrm.get("deletable", False)
+        return self.hrm.get("deletable", True)
 
     def get_hrm_job_roles(self):
         """
@@ -709,11 +817,23 @@ class S3Config(Storage):
         """
         return self.hrm.get("use_teams", True)
 
+    def get_hrm_use_certificates(self):
+        """
+            Whether Human Resources should use Certificates
+        """
+        return self.hrm.get("use_certificates", True)
+
     def get_hrm_use_credentials(self):
         """
             Whether Human Resources should use Credentials
         """
         return self.hrm.get("use_credentials", True)
+
+    def get_hrm_use_description(self):
+        """
+            Whether Human Resources should use Description
+        """
+        return self.hrm.get("use_description", True)
 
     def get_hrm_use_education(self):
         """
@@ -721,11 +841,29 @@ class S3Config(Storage):
         """
         return self.hrm.get("use_education", False)
 
+    def get_hrm_use_id(self):
+        """
+            Whether Human Resources should use ID
+        """
+        return self.hrm.get("use_id", True)
+
+    def get_hrm_use_skills(self):
+        """
+            Whether Human Resources should use Skills
+        """
+        return self.hrm.get("use_skills", True)
+
+    def get_hrm_use_trainings(self):
+        """
+            Whether Human Resources should use Trainings
+        """
+        return self.hrm.get("use_trainings", True)
+
     def get_hrm_organisation_label(self):
         """
             Label for Organisations in Human Resources
         """
-        return self.hrm.get("organisation_label", current.T("Organization"))
+        return current.T(self.hrm.get("organisation_label", "Organization"))
 
     # -------------------------------------------------------------------------
     # Inventory Management Settings
@@ -811,12 +949,63 @@ class S3Config(Storage):
         """
         return self.org.get("site_code_len", 10)
 
+    def get_org_site_label(self):
+        """
+            Label for site_id fields
+        """
+        return current.T(self.org.get("site_label", "Facility"))
+
     def get_org_summary(self):
         """
             Whether to use Summary fields for Organisation/Office:
                 # National/International staff
         """
         return self.org.get("summary", False)
+
+    def set_org_dependent_field(self,
+                                tablename=None,
+                                fieldname=None,
+                                enable_field =True):
+        """
+            Enables/Disables optional fields according to a user's Organisation
+            - must specify either field or tablename/fieldname
+                                           (e.g. for virtual fields)
+        """
+
+        auth = current.auth
+        if auth.s3_has_role(auth.get_system_roles().ADMIN):
+            # Admins see all fields
+            enabled = True
+        else:
+            # Default to disabled
+            enabled = False
+
+        #elif not tablename or not fieldname:
+        #    raise SyntaxError
+
+        dependent_fields = self.org.get("dependent_fields", None)
+        if dependent_fields and not enabled:
+            org_name_list = dependent_fields.get("%s.%s" % (tablename,
+                                                            fieldname),
+                                                 None)
+
+            if org_name_list:
+                s3db = current.s3db
+                otable = s3db.org_organisation
+                root_org_id = auth.root_org()
+                root_org = current.db(otable.id == root_org_id).select(otable.name,
+                                                                       limitby=(0, 1),
+                                                                       cache=s3db.cache
+                                                                       ).first()
+                if root_org:
+                    enabled = root_org.name in org_name_list
+
+        if enable_field:
+            field = current.s3db[tablename][fieldname]
+            field.readable = enabled
+            field.writable = enabled
+
+        return enabled
 
     # -------------------------------------------------------------------------
     # Proc
@@ -947,7 +1136,7 @@ class S3Config(Storage):
     # -------------------------------------------------------------------------
     # Supply
     def get_supply_catalog_default(self):
-        return self.inv.get("catalog_default", "Other Items")
+        return self.inv.get("catalog_default", "Default")
 
     # -------------------------------------------------------------------------
     # Hospital Registry

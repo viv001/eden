@@ -54,17 +54,20 @@ T = current.T
 # Uncomment this to request the Organisation when a user registers
 #settings.auth.registration_requests_organisation = True
 # Uncomment this to have the Organisation selection during registration be mandatory
-#settings.auth.registration_organisation_mandatory = True
+#settings.auth.registration_organisation_required = True
 # Uncomment this to have the Organisation input hidden unless the user enters a non-whitelisted domain
 #settings.auth.registration_organisation_hidden = True
 # Uncomment this to default the Organisation during registration
 #settings.auth.registration_organisation_default = "My Organisation"
-# Uncomment & populate these to set the default roles assigned to newly-registered users
-#settings.auth.registration_roles = ["STAFF", "PROJECT_EDIT"]
+# Uncomment to set the default role UUIDs assigned to newly-registered users
+# This is a dictionary of lists, where the key is the realm that the list of roles applies to
+# The key 0 implies not realm restricted
+# The keys "organisation_id" and "site_id" can be used to indicate the user's "organisation_id" and "site_id"
+#settings.auth.registration_roles = { 0: ["STAFF", "PROJECT_EDIT"]}
 # Uncomment this to enable record approval
 #settings.auth.record_approval = True
-# Uncomment & populate this to set an alternative record approver role
-#settings.auth.record_approver_role = "APPROVER"
+# Uncomment this and specify a list of tablenames for which record approval is required
+#settings.auth.record_approval_required_for = ["project_project"]
 # Uncomment this to request an image when users register
 #settings.auth.registration_requests_image = True
 # Uncomment this to direct newly-registered users to their volunteer page to be able to add extra details
@@ -107,7 +110,7 @@ T = current.T
 # Uncomment these to use US-style dates in English (localisations can still convert to local format)
 #settings.L10n.date_format = T("%m-%d-%Y")
 #settings.L10n.time_format = T("%H:%M:%S")
-#settings.L10n.datetime_format = T("%m-%d-%Y %H:%M:%S")
+#settings.L10n.datetime_format = T("%m-%d-%Y %H:%M")
 # Number formats (defaults to ISO 31-0)
 # Decimal separator for numbers (defaults to ,)
 settings.L10n.decimal_separator = "."
@@ -169,6 +172,8 @@ settings.L10n.decimal_separator = "."
 #settings.gis.duplicate_features = True
 # Mouse Position: 'normal', 'mgrs' or 'off'
 #settings.gis.mouse_position = "mgrs"
+# PoIs to export in KML/OSM feeds from Admin locations
+#settings.gis.poi_resources = ["cr_shelter", "hms_hospital", "org_office"]
 
 # Messaging Settings
 # If you wish to use a parser.py in another folder than "default"
@@ -207,13 +212,79 @@ settings.L10n.decimal_separator = "."
 # Enable this to use the label 'Camp' instead of 'Shelter'
 #settings.ui.camp = True
 # Enable this to change the label for 'Mobile Phone'
-#settings.ui.label_mobile_phone = T("Cell Phone")
+#settings.ui.label_mobile_phone = "Cell Phone"
 # Enable this to change the label for 'Postcode'
-#settings.ui.label_postcode = T("ZIP Code")
+#settings.ui.label_postcode = "ZIP Code"
 # Enable Social Media share buttons
 #settings.ui.social_buttons = True
 
-# Request
+# Organisation Management
+# Set the length of the auto-generated org/site code the default is 10
+#settings.org.site_code_len = 3
+# Set the label for Sites
+#settings.org.site_label = "Facility"
+# Uncomment to add summary fields for Organisations/Offices for # National/International staff
+#settings.org.summary = True
+# Enable certain fields just for specific Organisations
+# Requires a call to settings.set_org_dependent_field(field)
+#settings.org.dependent_fields = \
+#    {"<table name>.<field name>"  : ["<Organisation Name>"],
+#    ...
+#     }
+
+# Human Resource Management
+# Uncomment to allow Staff & Volunteers to be registered without an email address
+#settings.hrm.email_required = False
+# Uncomment to allow HR records to be deletable rather than just marking them as obsolete
+#settings.hrm.deletable = True
+# Uncomment to allow HRs to have multiple Job Roles in addition to their Job Title
+#settings.hrm.job_roles = True
+# Uncomment to hide the Staff resource
+#settings.hrm.show_staff = False
+# Uncomment to allow hierarchical categories of Skills, which each need their own set of competency levels.
+#settings.hrm.skill_types = True
+# Uncomment to disable Staff experience
+#settings.hrm.staff_experience = False
+# Uncomment to disable Volunteer experience
+#settings.hrm.vol_experience = False
+# Uncomment to show the Organisation name in HR represents
+#settings.hrm.show_organisation = True
+# Uncomment to disable the use of HR Certificates
+#settings.hrm.use_certificates = False
+# Uncomment to disable the use of HR Credentials
+#settings.hrm.use_credentials = False
+# Uncomment to disable the use of HR Description
+#settings.hrm.use_description = False
+# Uncomment to enable the use of HR Education
+#settings.hrm.use_education = True
+# Uncomment to disable the use of HR ID
+#settings.hrm.use_id = False
+# Uncomment to disable the use of HR Skills
+#settings.hrm.use_skills = False
+# Uncomment to disable the use of HR Teams
+#settings.hrm.use_teams = False
+# Uncomment to disable the use of HR Trainings
+#settings.hrm.use_trainings = False
+
+# Inventory Management
+#settings.inv.collapse_tabs = False
+# Use the term 'Order' instead of 'Shipment'
+#settings.inv.shipment_name = "order"
+#settings.inv.send_form_name = "Tally Out Sheet"
+#settings.inv.send_short_name = "TO"
+#settings.inv.send_ref_field_name = "Tally Out Number"
+#settings.inv.recv_form_name = "Acknowledgement Receipt for Donations Received Form"
+#settings.inv.recv_shortname = "ARDR"
+#settings.inv.shipment_types = {
+#         0: T("-"),
+#         1: T("Other Warehouse"),
+#         2: T("Donation"),
+#         3: T("Foreign Donation"),
+#         4: T("Local Purchases"),
+#         5: T("Confiscated Goods from Bureau Of Customs")
+#    }
+
+# Requests Management
 #settings.req.type_inv_label = T("Donations")
 #settings.req.type_hrm_label = T("Volunteers")
 # Allow the status for requests to be set manually,
@@ -267,58 +338,10 @@ settings.L10n.decimal_separator = "."
 #    msg_record_deleted = T("Request for Volunteers Canceled"),
 #    msg_list_empty = T("No Requests for Volunteers"))
 
-# Inventory Management
-#settings.inv.collapse_tabs = False
-# Use the term 'Order' instead of 'Shipment'
-#settings.inv.shipment_name = "order"
-#settings.inv.send_form_name = "Tally Out Sheet"
-#settings.inv.send_short_name = "TO"
-#settings.inv.send_ref_field_name = "Tally Out Number"
-#settings.inv.recv_form_name = "Acknowledgement Receipt for Donations Received Form"
-#settings.inv.recv_shortname = "ARDR"
-#settings.inv.shipment_types = {
-#         0: T("-"),
-#         1: T("Other Warehouse"),
-#         2: T("Donation"),
-#         3: T("Foreign Donation"),
-#         4: T("Local Purchases"),
-#         5: T("Confiscated Goods from Bureau Of Customs")
-#    }
-
 # Supply
 #settings.supply.use_alt_name = False
 # Do not edit after deployment
-#settings.supply.catalog_default = T("Other Items")
-
-# Organisation Management
-# Set the length of the auto-generated org/site code the default is 10
-#settings.org.site_code_len = 3
-# Uncomment to add summary fields for Organisations/Offices for # National/International staff
-#settings.org.summary = True
-
-# Human Resource Management
-# Uncomment to allow Staff & Volunteers to be registered without an email address
-#settings.hrm.email_required = False
-# Uncomment to allow HR records to be deletable rather than just marking them as obsolete
-#settings.hrm.deletable = True
-# Uncomment to allow HRs to have multiple Job Roles in addition to their Job Title
-#settings.hrm.job_roles = True
-# Uncomment to hide the Staff resource
-#settings.hrm.show_staff = False
-# Uncomment to allow hierarchical categories of Skills, which each need their own set of competency levels.
-#settings.hrm.skill_types = True
-# Uncomment to disable Staff experience
-#settings.hrm.staff_experience = False
-# Uncomment to disable Volunteer experience
-#settings.hrm.vol_experience = False
-# Uncomment to show the Organisation name in HR represents
-#settings.hrm.show_organisation = True
-# Uncomment to disable the use of HR Credentials
-#settings.hrm.use_credentials = False
-# Uncomment to enable the use of HR Education
-#settings.hrm.use_education = True
-# Uncomment to disable the use of HR Teams
-#settings.hrm.use_teams = False
+#settings.supply.catalog_default = T("Default")
 
 # Projects
 # Uncomment this to use settings suitable for a global/regional organisation (e.g. DRR)
@@ -399,6 +422,11 @@ settings.modules = OrderedDict([
             restricted = True,
             access = "|1|",     # Only Administrators can see this module in the default menu & access the controller
             module_type = None  # This item is handled separately for the menu
+        )),
+    ("translate", Storage(
+            name_nice = T("Translation Functionality"),
+            #description = "Selective translation of strings based on module.",
+            module_type = None,
         )),
     # Uncomment to enable internal support requests
     #("support", Storage(

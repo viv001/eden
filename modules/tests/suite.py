@@ -3,11 +3,26 @@
 # or
 # python web2py.py -S eden -M -R applications/eden/modules/tests/suite.py -A testscript
 
-import sys
-import re
-import time
-import unittest
 import argparse
+import unittest
+
+from gluon import current
+from gluon.storage import Storage
+
+current.data = Storage()
+
+# @ToDo: Load these only when running Selenium tests
+# (shouldn't be required for Smoke tests)
+# (means removing the *)
+from selenium import webdriver
+from tests.asset import *
+from tests.hrm import *
+from tests.inv import *
+from tests.member import *
+from tests.org import *
+from tests.project import *
+from tests.staff import *
+from tests.volunteer import *
 
 def loadAllTests():
 
@@ -23,9 +38,15 @@ def loadAllTests():
 
     # Setup Staff
     addTests(loadTests(CreateStaff))
+    addTests(loadTests(CreateStaffJobRole))
+    addTests(loadTests(CreateStaffCertificate))
 
-    # Setup New Volunteer
+    # Setup Volunteer
     addTests(loadTests(CreateVolunteer))
+    addTests(loadTests(CreateVolunteerJobRole))
+    addTests(loadTests(CreateVolunteerProgramme))
+    addTests(loadTests(CreateVolunteerSkill))
+    addTests(loadTests(CreateVolunteerCertificate))
 
     # Create Staff & Volunteer Training
     addTests(loadTests(CreateStaffTraining))
@@ -68,30 +89,28 @@ def loadAllTests():
     # Create Members
     addTests(loadTests(CreateMember))
 
-    # Search Staff (Simple & Advance)
-    addTests(loadTests(SearchStaff))
-
+    # Search Staff (Simple & Advanced)
+    #addTests(loadTests(SearchStaff))
     return suite
 
 # Set up the command line arguments
 desc = "Script to run the Sahana Eden test suite."
 parser = argparse.ArgumentParser(description = desc)
 parser.add_argument("-C", "--class",
-                    help = "Name of class to run"
-                   )
+                    help = "Name of class to run")
+
 method_desc = """Name of method to run, this is used in conjunction with the
 class argument or with the name of the class followed by the name of the method
 separated with a period, class.method.
 """
+
 parser.add_argument("-M",
                     "--method",
                     "--test",
-                    help = method_desc
-                   )
+                    help = method_desc)
 parser.add_argument("-A",
                     "--auth",
-                    help = """Run an Auth test without the webdriver""",
-                   )
+                    help = "web2py default argument feed")
 parser.add_argument("-V", "--verbose",
                     type = int,
                     default = 1,
@@ -99,17 +118,15 @@ parser.add_argument("-V", "--verbose",
 parser.add_argument("--nohtml",
                     action='store_const',
                     const=True,
-                    help = "Disable HTML reporting."
-                   )
+                    help = "Disable HTML reporting.")
 parser.add_argument("--html-path",
                     help = "Path where the HTML report will be saved.",
-                    default = ""
-                   )
+                    default = "")
 parser.add_argument("--html-name-date",
                     action='store_const',
                     const=True,
-                    help = "Include just the date in the name of the HTML report."
-                   )
+                    help = "Include just the date in the name of the HTML report.")
+
 suite_desc = """This will execute a standard testing schedule. The valid values
 are, smoke, quick, complete and full. If a method or class options is selected
 the the suite will be ignored.
@@ -123,12 +140,13 @@ full: This will run all test
 """
 parser.add_argument("--suite",
                     help = suite_desc,
-                    choices = ["smoke", "auth", "quick", "complete", "full"],
+                    choices = ["smoke", "roles", "quick", "complete", "full"],
                     default = "quick")
 parser.add_argument("--link-depth",
                     type = int,
                     default = 16,
                     help = "The recursive depth when looking for links")
+
 up_desc = """The user name and password, separated by a /. Multiple user name
 and passwords can be added by separating them with a comma. If multiple user
 name and passwords are provided then the same test will be run sequentially
@@ -136,12 +154,12 @@ using the given user in each case.
 """
 parser.add_argument("--user-password",
                     default = "admin@example.com/testing",
-                    help = up_desc
-                    )
+                    help = up_desc)
 parser.add_argument("--keep-browser-open",
                     help = "Keep the browser open once the tests have finished running",
                     action='store_const',
                     const = True)
+
 desc = """Run the smoke tests even if debug is set to true.
 
 With debug on it can add up to a second per link and given that a full run
@@ -151,23 +169,16 @@ this setting one can be measured in hours.
 parser.add_argument("--force-debug",
                     action='store_const',
                     const=True,
-                    help = desc
-                   )
+                    help = desc)
+desc = """Set a threshold in seconds.
+If takes longer than this to get the link then it will be reported.
+"""
+parser.add_argument("--threshold",
+                    type = int,
+                    default = 10,
+                    help = desc)
 argsObj = parser.parse_args()
 args = argsObj.__dict__
-
-# Selenium WebDriver
-from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
-
-from gluon import current
-from gluon.storage import Storage
-
-current.data = Storage()
-
-# S3 Tests
-from tests.web2unittest import *
-from tests import *
 
 # Read Settings
 settings = current.deployment_settings
@@ -206,17 +217,19 @@ if args["method"]:
         name = args["method"]
     suite = unittest.TestLoader().loadTestsFromName(args["method"],
                                                     globals()[args["class"]]
-                                                   )
+                                                    )
 elif args["class"]:
     browser = config.browser = webdriver.Firefox()
     browser.implicitly_wait(config.timeout)
     browser_open = True
     suite = unittest.TestLoader().loadTestsFromTestCase(globals()[args["class"]])
+
 elif args["suite"] == "smoke":
     try:
         from tests.smoke import *
         broken_links = BrokenLinkTest()
         broken_links.setDepth(args["link_depth"])
+        broken_links.threshold = args["threshold"]
         broken_links.setUser(args["user_password"])
         suite = unittest.TestSuite()
         suite.addTest(broken_links)
@@ -224,12 +237,13 @@ elif args["suite"] == "smoke":
         from s3 import s3_debug
         s3_debug("%s, unable to run the smoke tests." % msg)
         pass
-elif args["auth"]:
-    from tests.auth import *
-    create_role_test_data()
+
+elif args["suite"] == "roles":
+
+    from tests.roles.test_roles import *
     #suite = unittest.TestSuite()
     suite = test_roles()
-    
+
     #test_role = TestRole()
     #test_role.set(org = "Org-A",
     #              user = "asset_reader@Org-A.com",
@@ -243,6 +257,7 @@ elif args["auth"]:
     #                     permission = True)
     #suite.addTest(test_role)
     #suite = unittest.TestLoader().loadTestsFromTestCase(globals()[args["auth"]])
+
 elif args["suite"] == "complete":
     browser = config.browser = webdriver.Firefox()
     browser.implicitly_wait(config.timeout)
@@ -252,17 +267,19 @@ elif args["suite"] == "complete":
         from tests.smoke import *
         broken_links = BrokenLinkTest()
         broken_links.setDepth(args["link_depth"])
+        broken_links.threshold = args["threshold"]
         broken_links.setUser(args["user_password"])
         suite.addTest(broken_links)
     except NameError as msg:
         from s3 import s3_debug
         s3_debug("%s, unable to run the smoke tests." % msg)
         pass
+
 else:
+    # Run all Tests
     browser = config.browser = webdriver.Firefox()
     browser.implicitly_wait(config.timeout)
     browser_open = True
-    # Run all Tests
     suite = loadAllTests()
 
 config.html = False
@@ -278,15 +295,14 @@ else:
         # Windows compatibility
         filename = filename.replace(":", "-")
         fullname = os.path.join(path,filename)
-        fp = file(fullname, "wb")
+        fp = open(fullname, "wb")
 
         config.html = True
         from tests.runner import EdenHTMLTestRunner
-        runner = EdenHTMLTestRunner(
-                                    stream = fp,
+        runner = EdenHTMLTestRunner(stream = fp,
                                     title = "Sahana Eden",
                                     verbosity = config.verbose,
-                                   )
+                                    )
         runner.run(suite)
     except ImportError:
         config.html = False
@@ -295,3 +311,5 @@ else:
 # Cleanup
 if browser_open and not args["keep_browser_open"]:
     browser.close()
+
+# END =========================================================================

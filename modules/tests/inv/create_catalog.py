@@ -27,9 +27,7 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from gluon import current
 from tests.web2unittest import SeleniumUnitTest
-
 
 class CreateCatalog(SeleniumUnitTest):
     def test_inv006_create_catalog(self):
@@ -47,10 +45,10 @@ class CreateCatalog(SeleniumUnitTest):
         self.login(account="admin", nexturl="supply/catalog/create")
         self.create("supply_catalog", 
                     [( "name",
-                       "Romanian Food Catalogue" ),
+                       "IFRC Food Catalogue" ),
                      ( "organisation_id",
-                       "Romanian Food Assistance Association",
-                       "autocomplete" ),
+                       "International Federation of Red Cross and Red Crescent Societies (IFRC)",
+                       "option" ),
                      ( "comments",
                        "This is a test Catalogue")
                      ]

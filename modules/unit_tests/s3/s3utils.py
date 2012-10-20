@@ -23,8 +23,8 @@ class S3FKWrappersTests(unittest.TestCase):
         self.assertTrue(s3_has_foreign_key(htable.person_id))
 
         otable = s3db.org_organisation
-        self.assertTrue(s3_has_foreign_key(otable.sector_id))
-        self.assertFalse(s3_has_foreign_key(otable.sector_id, m2m=False))
+        self.assertTrue(s3_has_foreign_key(otable.multi_sector_id))
+        self.assertFalse(s3_has_foreign_key(otable.multi_sector_id, m2m=False))
 
     def testGetForeignKey(self):
 
@@ -35,12 +35,12 @@ class S3FKWrappersTests(unittest.TestCase):
         self.assertFalse(multiple)
 
         otable = s3db.org_organisation
-        ktablename, key, multiple = s3_get_foreign_key(otable.sector_id)
+        ktablename, key, multiple = s3_get_foreign_key(otable.multi_sector_id)
         self.assertEqual(ktablename, "org_sector")
         self.assertEqual(key, "id")
         self.assertTrue(multiple)
 
-        ktablename, key, multiple = s3_get_foreign_key(otable.sector_id, m2m=False)
+        ktablename, key, multiple = s3_get_foreign_key(otable.multi_sector_id, m2m=False)
         self.assertEqual(ktablename, None)
         self.assertEqual(key, None)
         self.assertEqual(multiple, None)
@@ -116,7 +116,7 @@ class S3SQLTableTests(unittest.TestCase):
         # need to be logged in to query resources
         auth.s3_impersonate('admin@example.com')
 
-        r = current.manager.define_resource('org', 'organisation')
+        r = current.s3db.resource("org_organisation")
         table = S3SQLTable.from_resource(r,
                                          [{'name': 'id'}],
                                          limit=1)
@@ -146,7 +146,7 @@ class S3DataTableTests(unittest.TestCase):
         # need to be logged in to query resources
         auth.s3_impersonate('admin@example.com')
 
-        r = current.manager.define_resource('org', 'organisation')
+        r = current.s3db.resource("org_organisation")
 
         # no limit
         table = S3DataTable.from_resource(r,

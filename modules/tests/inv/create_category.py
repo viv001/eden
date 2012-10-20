@@ -27,9 +27,7 @@
     OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from gluon import current
 from tests.web2unittest import SeleniumUnitTest
-
 
 class CreateCategory(SeleniumUnitTest):
     def test_inv006_create_category(self):
@@ -45,7 +43,7 @@ class CreateCategory(SeleniumUnitTest):
         self.login(account="admin", nexturl="supply/item_category/create")
         self.create("supply_item_category", 
                     [( "catalog_id",
-                       "Other Items",
+                       "Default",
                        "option" ),
                      ( "parent_item_category_id",
                        "Standard > Food",

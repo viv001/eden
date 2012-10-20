@@ -1,7 +1,7 @@
 {{try:}}{{=H2(title)}}
 {{except:}}{{pass}}
 <div id='rheader'>
-{{try:}}{{=rheader}}
+{{try:}}{{=XML(rheader)}}
  </div>
  <div id='component'>
 {{except:}}
@@ -11,7 +11,6 @@
 {{try:}}{{=H3(subtitle)}}{{except:}}{{pass}}
 <div>
 {{try:}}{{=buttons["delete_btn"]}}{{except:}}{{pass}}
-<p>&nbsp;</p>
 </div>
 <div id='map'></div>
 {{include "last_update.html"}}
