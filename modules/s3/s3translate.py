@@ -325,7 +325,51 @@ class TranslateParseFiles:
                     if token.tok_name[id] == "STRING":
                         tmpstr.append(value)
 
-        # ---------------------------------------------------------------------
+        #----------------------------------------------------------------------
+        def parseConfigforTemplate(self, entry):
+            if isinstance(entry,list):
+                id = entry[0]
+                value = entry[1]
+                if isinstance(value,list):
+                    for element in entry:
+                        template = self.parseConfigforTemplate(self, entry)
+                        if template:
+                            return template
+                else:
+                    if self.tflag == 1 and token.tok_name[id] == "STRING":
+                        return value[1:-1]
+                    if self.fflag == 1 and token.tok_name[id] == "NAME":
+                        if value != "base":   
+                            if value == "template":
+                                tflag = 1
+                            fflag = 0
+
+                    elif token.tok_name[id] == "NAME" and \
+                         (value == "deployment_settings" or \
+                          value == "settings"):
+                         self.fflag = 1
+            return None
+
+        #----------------------------------------------------------------------
+        def parseTemplateConfig(self, entry, modlist):
+            if isinstance(entry,list):
+                id = entry[0]
+                value = entry[1]
+                if isinstance(value,list):
+                    for element in entry:
+                        self.parseTemplateConfig(self, entry, modlist)
+                else:
+                    if self.fflag == 1 and token.tok_name[id] == "NAME":
+                        self.func_name = value
+                        self.fflag = 0
+                    elif token.tok_name[id] == "NAME" and \
+                         (value == "deployment_settings" or \
+                          value == "settings"):
+                         self.fflag = 1
+                    elif self.func_name == "modules" and \
+                         token.tok_name[id] == "STRING":
+                        modlist.append(value[1:-1])
+        #----------------------------------------------------------------------
         def parseConfig(self, spmod, strings, entry, modlist):
             """ Function to extract strings from config.py / 000_config.py """
 
@@ -727,6 +771,11 @@ class TranslateReadFiles:
             return strings
 
         # ---------------------------------------------------------------------
+
+        def get_active_modules(self):
+
+            
+        #----------------------------------------------------------------------
         def get_user_strings(self):
             """
                 Function to return the list of user-supplied strings
