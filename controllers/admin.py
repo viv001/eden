@@ -673,6 +673,7 @@ def translate():
 
         opt = request.vars.opt
         if opt == "1":
+
             # Select modules for Translation
             if form.accepts(request.vars, session):
 
@@ -723,6 +724,10 @@ def translate():
             langlist = A.get_langcodes()
             langlist.sort()
 
+            # Obtaining list of active modules
+            R = TranslateReadFiles()
+            activemodlist = R.get_active_modules(modlist)
+
             table = TABLE(_class="translation_module_table")
             table.append(BR())
 
@@ -734,17 +739,24 @@ def translate():
             max_rows = int(ceil(modcount / float(NO_OF_COLUMNS)))
 
             while num < max_rows:
+                check = None
+                if modlist[num] in activemodlist:
+                    check = "yes"
                 row = TR(TD(num + 1),
                          TD(INPUT(_type="checkbox", _name="module_list",
-                                  _value=modlist[num])),
+                                  _value=modlist[num], _checked = check)),
                          TD(modlist[num]))
                 for c in range(1, NO_OF_COLUMNS):
                     cmax_rows = num + c*max_rows
+                    check = None
+                    if modlist[cmax_rows] in activemodlist:
+                        check = "yes"
                     if cmax_rows < modcount:
                         row.append(TD(cmax_rows + 1))
                         row.append(TD(INPUT(_type="checkbox",
                                             _name="module_list",
-                                            _value=modlist[cmax_rows])))
+                                            _value=modlist[cmax_rows],
+                                            _checked = check )))
                         row.append(TD(modlist[cmax_rows]))
                 num += 1
                 table.append(row)

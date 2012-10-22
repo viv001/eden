@@ -327,23 +327,32 @@ class TranslateParseFiles:
 
         #----------------------------------------------------------------------
         def parseConfigforTemplate(self, entry):
+            """ Recursive function to obtain the config template being used """
+
             if isinstance(entry,list):
                 id = entry[0]
                 value = entry[1]
+
+                # If the element is not a root node,
+                # go deeper into the tree using dfs
                 if isinstance(value,list):
                     for element in entry:
-                        template = self.parseConfigforTemplate(self, entry)
+                        template = self.parseConfigforTemplate(element)
+                        # If the template name is found, return it
                         if template:
                             return template
                 else:
+                    # tflag indicates if "settings.base.template" has occurred
                     if self.tflag == 1 and token.tok_name[id] == "STRING":
+                        # Return the template name
                         return value[1:-1]
+                    # to check varname from settings.varname
                     if self.fflag == 1 and token.tok_name[id] == "NAME":
-                        if value != "base":   
+                        if value != "base":
                             if value == "template":
-                                tflag = 1
-                            fflag = 0
-
+                                self.tflag = 1
+                            self.fflag = 0
+                    # Set fflag if deployment_settings/settings occurs
                     elif token.tok_name[id] == "NAME" and \
                          (value == "deployment_settings" or \
                           value == "settings"):
@@ -351,24 +360,38 @@ class TranslateParseFiles:
             return None
 
         #----------------------------------------------------------------------
-        def parseTemplateConfig(self, entry, modlist):
+        def parseTemplateConfig(self, entry, modlist, activemodlist):
+            """ 
+                Recursive function to obtain the list of active modules in
+                the template/config.py file 
+            """
+
             if isinstance(entry,list):
                 id = entry[0]
                 value = entry[1]
+
+                # If the element is not a root node,
+                # go deeper into the tree using dfs
                 if isinstance(value,list):
                     for element in entry:
-                        self.parseTemplateConfig(self, entry, modlist)
+                        self.parseTemplateConfig(element, modlist, activemodlist)
                 else:
+                    # Get varname from deployment_settings.varname
                     if self.fflag == 1 and token.tok_name[id] == "NAME":
                         self.func_name = value
                         self.fflag = 0
+                    # Set fflag if deployment_settings occurs
                     elif token.tok_name[id] == "NAME" and \
                          (value == "deployment_settings" or \
                           value == "settings"):
                          self.fflag = 1
+                    # If varname is modules, then extract the active modules
                     elif self.func_name == "modules" and \
                          token.tok_name[id] == "STRING":
-                        modlist.append(value[1:-1])
+                        # If the string is a valid module name, append it
+                        if value[1:-1] in modlist:
+                            activemodlist.append(value[1:-1])
+
         #----------------------------------------------------------------------
         def parseConfig(self, spmod, strings, entry, modlist):
             """ Function to extract strings from config.py / 000_config.py """
@@ -772,7 +795,68 @@ class TranslateReadFiles:
 
         # ---------------------------------------------------------------------
 
-        def get_active_modules(self):
+        def get_active_modules(self, modlist):
+
+            """ Function to get a list of active modules by parsing config files """
+
+            # Retreiving name of current template being used
+            filename = os.path.join(current.request.folder,"models","000_config.py")
+            try:
+                f = open(filename)
+            except:
+                return []
+
+            # Read all contents of file
+            fileContent = f.read()
+            # Remove CL-RF and NOEOL characters
+            fileContent = fileContent.replace("\r", "") + "\n"
+
+            P = TranslateParseFiles()
+
+            try:
+                st = parser.suite(fileContent)
+            except:
+                return []
+
+            f.close()
+
+            # Create a parse tree list for traversal
+            stList = parser.st2list(st, line_info=1)
+
+            # Get the current template
+            for element in stList:
+                template = P.parseConfigforTemplate(element)
+                if template:
+                    break
+
+            # Retreiving list of active modules from the current template
+            filename = os.path.join(current.request.folder,"private","templates",template,"config.py")
+            try:
+                f = open(filename)
+            except:
+                return []
+
+            # Read all contents of file
+            fileContent = f.read()
+            # Remove CL-RF and NOEOL characters
+            fileContent = fileContent.replace("\r", "") + "\n"
+
+            try:
+                st = parser.suite(fileContent)
+            except:
+                return []
+
+            f.close()
+
+            # Create a parse tree list for traversal
+            stList = parser.st2list(st, line_info=1)
+	
+            activemodlist = []
+            # Get the list of active modules
+            for element in stList:
+                P.parseTemplateConfig(element, modlist, activemodlist)
+
+            return activemodlist
 
             
         #----------------------------------------------------------------------
